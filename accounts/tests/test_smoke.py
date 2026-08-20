@@ -9,8 +9,8 @@ class ProjectSmokeTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
-    def test_standard_auth_configuration_precedes_custom_user_app(self):
-        self.assertEqual(settings.AUTH_USER_MODEL, "auth.User")
+    def test_standard_auth_configuration_includes_custom_user_app(self):
+        self.assertEqual(settings.AUTH_USER_MODEL, "accounts.User")
         self.assertTrue(
             {
                 "django.contrib.auth",
@@ -20,7 +20,7 @@ class ProjectSmokeTests(SimpleTestCase):
                 "django.contrib.staticfiles",
             }.issubset(settings.INSTALLED_APPS)
         )
-        self.assertNotIn("accounts", settings.INSTALLED_APPS)
+        self.assertIn("accounts", settings.INSTALLED_APPS)
         self.assertIn(
             "django.contrib.auth.middleware.AuthenticationMiddleware",
             settings.MIDDLEWARE,
