@@ -1,5 +1,6 @@
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
@@ -48,4 +49,6 @@ def mobile_dashboard(request):
 def _redirect_for_role(user):
     if user.role == User.Role.ADMIN:
         return redirect("management-dashboard")
-    return redirect("mobile-dashboard")
+    if user.role == User.Role.SAMPLER:
+        return redirect("mobile-dashboard")
+    raise PermissionDenied
