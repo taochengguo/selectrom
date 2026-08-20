@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "accounts",
     "personnel.apps.PersonnelConfig",
     "sampling.apps.SamplingConfig",
+    "audit.apps.AuditConfig",
 ]
 
 MIDDLEWARE = [
