@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN">
+<body>
+  <h1>{% if group %}编辑分组{% else %}新建分组{% endif %}</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">保存</button>
+  </form>
+  <a href="{% url 'personnel:group-list' %}">返回列表</a>
+</body>
+</html>

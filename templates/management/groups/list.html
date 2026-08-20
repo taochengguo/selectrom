@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<body>
+  <h1>人员分组</h1>
+  <a href="{% url 'personnel:group-create' %}">新建分组</a>
+  <ul>
+    {% for group in groups %}
+      <li>
+        {{ group.name }}
+        <a href="{% url 'personnel:group-edit' group.pk %}">编辑</a>
+      </li>
+    {% empty %}
+      <li>暂无分组</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
