@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts",
     "personnel.apps.PersonnelConfig",
+    "sampling.apps.SamplingConfig",
 ]
 
 MIDDLEWARE = [
