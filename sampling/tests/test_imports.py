@@ -73,6 +73,36 @@ class CandidateImportTests(TestCase):
         self.assertIn("第2行", str(error.exception))
         self.assertEqual(CandidateMaterial.objects.count(), 1)
 
+    def test_case_insensitive_duplicate_inside_file_is_rejected(self):
+        content = (
+            "物资编号,订单号,供应商,物资名称,物资数量\n"
+            "M-1,O-1,S,N,10\n"
+            "m-1,O-2,S,N,20\n"
+        ).encode("utf-8")
+
+        with self.assertRaises(CandidateImportError) as error:
+            import_candidates(task_id=self.task.id, actor=self.admin, csv_file=BytesIO(content))
+
+        self.assertIn("第3行", str(error.exception))
+        self.assertEqual(CandidateMaterial.objects.count(), 0)
+
+    def test_case_insensitive_duplicate_against_task_is_rejected(self):
+        CandidateMaterial.objects.create(
+            task=self.task,
+            material_number="M-1",
+            order_number="O-0",
+            supplier="已有供应商",
+            material_name="已有物资",
+            quantity=1,
+        )
+        content = "物资编号,订单号,供应商,物资名称,物资数量\nm-1,O-1,S,N,10\n".encode("utf-8")
+
+        with self.assertRaises(CandidateImportError) as error:
+            import_candidates(task_id=self.task.id, actor=self.admin, csv_file=BytesIO(content))
+
+        self.assertIn("第2行", str(error.exception))
+        self.assertEqual(CandidateMaterial.objects.count(), 1)
+
     def test_frozen_task_rejects_import(self):
         self.task.status = SamplingTask.Status.ASSIGNED
         self.task.save(update_fields=["status"])

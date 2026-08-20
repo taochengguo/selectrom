@@ -66,6 +66,16 @@ class TaskLifecycleTests(TestCase):
         self.assertEqual(audit.before_data["status"], SamplingTask.Status.DRAFT)
         self.assertEqual(audit.after_data["status"], SamplingTask.Status.READY)
 
+    def test_assigned_task_cannot_transition_back_to_ready(self):
+        task = self.make_task(status=SamplingTask.Status.ASSIGNED)
+
+        with self.assertRaises(TaskFrozenError):
+            mark_task_ready(task_id=task.id, actor=self.admin)
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, SamplingTask.Status.ASSIGNED)
+        self.assertEqual(TaskAuditLog.objects.count(), 0)
+
     def test_cancel_task_records_status_change(self):
         task = self.make_task()
 

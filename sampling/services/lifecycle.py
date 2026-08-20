@@ -110,6 +110,10 @@ def update_task(*, task_id, actor, **changes):
 def mark_task_ready(*, task_id, actor):
     with transaction.atomic():
         task = _lock_task(task_id)
+        if task.status == SamplingTask.Status.READY:
+            return task
+        if task.status != SamplingTask.Status.DRAFT:
+            raise TaskFrozenError("任务已执行，不能改回待执行状态")
         before = _task_data(task)
         candidate_count = task.candidates.count()
         if task.draw_count <= 0:

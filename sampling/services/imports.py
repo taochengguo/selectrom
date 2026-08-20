@@ -1,7 +1,8 @@
 import csv
+import unicodedata
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from audit.services import log_task_event
 from sampling.models import CandidateMaterial, SamplingTask
@@ -21,6 +22,10 @@ _FIELD_MAP = {
     "物资数量": "quantity",
 }
 _MUTABLE_TASK_STATUSES = {SamplingTask.Status.DRAFT, SamplingTask.Status.READY}
+
+
+def _material_number_key(value):
+    return unicodedata.normalize("NFC", value).casefold()
 
 
 def _decode_csv(csv_file):
@@ -45,7 +50,10 @@ def _validate_rows(rows, task):
     errors = []
     normalized_rows = []
     seen_numbers = set()
-    existing_numbers = set(task.candidates.values_list("material_number", flat=True))
+    existing_numbers = {
+        _material_number_key(number)
+        for number in task.candidates.values_list("material_number", flat=True)
+    }
 
     for row_number, row in enumerate(rows, start=2):
         if None in row:
@@ -64,11 +72,12 @@ def _validate_rows(rows, task):
 
         material_number = values["material_number"]
         if material_number:
-            if material_number in seen_numbers:
+            material_number_key = _material_number_key(material_number)
+            if material_number_key in seen_numbers:
                 errors.append(f"第{row_number}行：物资编号在文件中重复")
-            if material_number in existing_numbers:
+            if material_number_key in existing_numbers:
                 errors.append(f"第{row_number}行：物资编号已存在于任务中")
-            seen_numbers.add(material_number)
+            seen_numbers.add(material_number_key)
 
         if quantity is not None and all(values.values()):
             values["quantity"] = quantity
@@ -81,7 +90,7 @@ def _validate_rows(rows, task):
                     messages.extend(f"{field}：{message}" for message in field_errors)
                 errors.append(f"第{row_number}行：{'；'.join(messages)}")
             else:
-                normalized_rows.append(values)
+                normalized_rows.append((row_number, values))
 
     if errors:
         raise CandidateImportError("；".join(errors))
@@ -94,9 +103,23 @@ def import_candidates(*, task_id, actor, csv_file):
         task = SamplingTask.objects.select_for_update().get(pk=task_id)
         if task.status not in _MUTABLE_TASK_STATUSES:
             raise TaskFrozenError("任务已执行，候选物资不可修改")
-        values = _validate_rows(rows, task)
-        candidates = [CandidateMaterial(task=task, **row) for row in values]
-        CandidateMaterial.objects.bulk_create(candidates)
+        validated_rows = _validate_rows(rows, task)
+        candidates = [CandidateMaterial(task=task, **row) for _, row in validated_rows]
+        try:
+            with transaction.atomic():
+                CandidateMaterial.objects.bulk_create(candidates)
+        except IntegrityError as error:
+            duplicate_row = next(
+                (
+                    row_number
+                    for row_number, row in validated_rows
+                    if CandidateMaterial.objects.filter(
+                        task=task, material_number=row["material_number"]
+                    ).exists()
+                ),
+                validated_rows[0][0] if validated_rows else 2,
+            )
+            raise CandidateImportError(f"第{duplicate_row}行：物资编号已存在于任务中") from error
         log_task_event(
             task=task,
             actor=actor,
