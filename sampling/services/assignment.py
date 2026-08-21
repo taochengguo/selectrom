@@ -3,7 +3,7 @@ import secrets
 from django.db import transaction
 
 from audit.services import log_task_event
-from sampling.models import PersonnelAssignment, SamplingTask
+from sampling.models import PersonnelAssignment, SamplingBatch, SamplingTask
 
 
 def _candidate_user_ids(task):
@@ -71,6 +71,8 @@ def reassign_sampler(*, task_id: int, actor, reason: str):
     )
     if task.status != SamplingTask.Status.ASSIGNED:
         raise ValueError("任务当前状态不可执行")
+    if task.sampling_batches.filter(status=SamplingBatch.Status.AUTHORIZED).exists():
+        raise ValueError("存在待执行的重抽批次，不能重新分配抽样人员")
 
     current_assignments = list(
         task.personnel_assignments.select_for_update()

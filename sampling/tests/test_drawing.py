@@ -4,7 +4,8 @@ from django.test import TestCase
 
 from accounts.models import User
 from audit.models import TaskAuditLog
-from sampling.models import SamplingBatch, SamplingResult, SamplingTask
+from sampling.models import PersonnelAssignment, SamplingBatch, SamplingResult, SamplingTask
+from sampling.services.assignment import reassign_sampler
 from sampling.services.drawing import authorize_redraw, complete_task, draw_materials
 from sampling.tests.factories import SamplingFixturesMixin
 
@@ -85,6 +86,52 @@ class DrawingTests(SamplingFixturesMixin, TestCase):
         self.assertEqual(SamplingBatch.objects.filter(task=task).count(), 1)
         task.refresh_from_db()
         self.assertEqual(task.status, SamplingTask.Status.IN_PROGRESS)
+
+    @patch("sampling.services.drawing.secrets.SystemRandom.sample")
+    def test_pending_redraw_blocks_reassignment_and_original_sampler_fills_it(self, sample):
+        task, sampler, materials = self.make_assigned_task(draw_count=2)
+        other_sampler = User.objects.create_user("replacement_sampler", role=User.Role.SAMPLER)
+        task.personnel_group.members.add(other_sampler)
+        sample.side_effect = [
+            [materials[0].id, materials[1].id],
+            [materials[2].id, materials[0].id],
+        ]
+        initial = draw_materials(task_id=task.id, actor=sampler)
+        initial_material_ids = list(
+            initial.results.order_by("sequence").values_list("material_id", flat=True)
+        )
+        redraw = authorize_redraw(
+            task_id=task.id, actor=task.created_by, reason="结果需复核"
+        )
+        original_assignment = task.personnel_assignments.get(is_current=True)
+
+        with self.assertRaisesRegex(ValueError, "待执行的重抽批次"):
+            reassign_sampler(task_id=task.id, actor=task.created_by, reason="尝试更换人员")
+
+        original_assignment.refresh_from_db()
+        redraw.refresh_from_db()
+        self.assertTrue(original_assignment.is_current)
+        self.assertEqual(original_assignment.selected_user_id, sampler.id)
+        self.assertEqual(PersonnelAssignment.objects.filter(task=task).count(), 1)
+        self.assertEqual(PersonnelAssignment.objects.filter(task=task, is_current=True).count(), 1)
+        self.assertEqual(redraw.status, SamplingBatch.Status.AUTHORIZED)
+        self.assertEqual(SamplingResult.objects.filter(batch=redraw).count(), 0)
+        self.assertEqual(
+            list(initial.results.order_by("sequence").values_list("material_id", flat=True)),
+            initial_material_ids,
+        )
+
+        locked_redraw = draw_materials(task_id=task.id, actor=sampler)
+
+        self.assertEqual(locked_redraw.id, redraw.id)
+        self.assertEqual(locked_redraw.version, 2)
+        self.assertEqual(locked_redraw.status, SamplingBatch.Status.LOCKED)
+        self.assertEqual(
+            list(SamplingBatch.objects.filter(task=task).order_by("version").values_list("version", flat=True)),
+            [1, 2],
+        )
+        self.assertEqual(SamplingResult.objects.filter(batch=initial).count(), 2)
+        self.assertEqual(SamplingResult.objects.filter(batch=locked_redraw).count(), 2)
 
     @patch("sampling.services.drawing.secrets.SystemRandom.sample")
     def test_authorized_redraw_creates_new_version_and_preserves_history(self, sample):
