@@ -52,6 +52,46 @@ def _latest_locked_batch(task):
     )
 
 
+def _draw_action(task):
+    if task.status != SamplingTask.Status.ASSIGNED:
+        return None
+    if task.sampling_batches.filter(
+        kind=SamplingBatch.Kind.REDRAW,
+        status=SamplingBatch.Status.AUTHORIZED,
+    ).exists():
+        return "redraw"
+    if not task.sampling_batches.filter(status=SamplingBatch.Status.LOCKED).exists():
+        return "initial"
+    return None
+
+
+def _set_viewed_at_if_current(*, task, assignment, user):
+    return PersonnelAssignment.objects.filter(
+        pk=assignment.pk,
+        task=task,
+        selected_user=user,
+        is_current=True,
+        viewed_at__isnull=True,
+    ).update(viewed_at=timezone.now())
+
+
+def _mark_current_assignment_viewed(task, assignment, user):
+    if assignment.viewed_at is not None:
+        return task, assignment
+    if _set_viewed_at_if_current(task=task, assignment=assignment, user=user):
+        assignment.refresh_from_db(fields=["viewed_at"])
+        return task, assignment
+
+    task = _owned_task(user, task.pk)
+    assignment = _current_assignment(task, user)
+    if assignment.viewed_at is None:
+        if not _set_viewed_at_if_current(task=task, assignment=assignment, user=user):
+            task = _owned_task(user, task.pk)
+            assignment = _current_assignment(task, user)
+        assignment.refresh_from_db(fields=["viewed_at"])
+    return task, assignment
+
+
 def _serialize_batch(batch):
     persisted_batch = get_object_or_404(
         SamplingBatch.objects.filter(status=SamplingBatch.Status.LOCKED),
@@ -130,11 +170,9 @@ def reminders(request):
 def task_detail(request, pk):
     task = _owned_task(request.user, pk)
     assignment = _current_assignment(task, request.user)
-    if assignment.viewed_at is None:
-        PersonnelAssignment.objects.filter(
-            pk=assignment.pk, viewed_at__isnull=True
-        ).update(viewed_at=timezone.now())
-        assignment.refresh_from_db(fields=["viewed_at"])
+    task, assignment = _mark_current_assignment_viewed(
+        task, assignment, request.user
+    )
     batch = _latest_locked_batch(task)
     results = batch.results.select_related("material").order_by("sequence") if batch else ()
     return render(
@@ -146,6 +184,7 @@ def task_detail(request, pk):
             "batch": batch,
             "results": results,
             "candidate_count": task.candidates.count(),
+            "draw_action": _draw_action(task),
         },
     )
 

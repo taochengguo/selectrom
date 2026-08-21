@@ -73,6 +73,36 @@ class DrawingTests(SamplingFixturesMixin, TestCase):
         self.assertEqual(repeated.id, initial.id)
         self.assertEqual(SamplingBatch.objects.filter(task=task).count(), 1)
 
+    @patch("sampling.services.drawing.secrets.SystemRandom.sample")
+    def test_repeat_redraw_returns_latest_locked_batch_without_new_results(self, sample):
+        task, sampler, materials = self.make_assigned_task(draw_count=2)
+        sample.side_effect = [
+            [materials[0].id, materials[1].id],
+            [materials[2].id, materials[0].id],
+        ]
+        draw_materials(task_id=task.id, actor=sampler)
+        authorized = authorize_redraw(
+            task_id=task.id, actor=task.created_by, reason="样品损坏"
+        )
+        redraw = draw_materials(task_id=task.id, actor=sampler)
+        persisted_result_ids = list(
+            redraw.results.order_by("sequence").values_list("id", flat=True)
+        )
+        sample.reset_mock()
+
+        repeated = draw_materials(task_id=task.id, actor=sampler)
+
+        self.assertEqual(redraw.id, authorized.id)
+        self.assertEqual(repeated.id, redraw.id)
+        self.assertEqual(repeated.version, 2)
+        self.assertEqual(
+            list(repeated.results.order_by("sequence").values_list("id", flat=True)),
+            persisted_result_ids,
+        )
+        self.assertEqual(SamplingBatch.objects.filter(task=task).count(), 2)
+        self.assertEqual(SamplingResult.objects.filter(batch__task=task).count(), 4)
+        sample.assert_not_called()
+
     def test_redraw_authorization_requires_admin_and_nonblank_reason(self):
         task, sampler, _ = self.make_assigned_task()
         draw_materials(task_id=task.id, actor=sampler)

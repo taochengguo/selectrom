@@ -19,14 +19,18 @@
 
   <section aria-labelledby="draw-heading">
     <h2 id="draw-heading">抽样结果</h2>
-    <div id="sampling-reel" aria-live="polite">点击开始抽样</div>
+    <div id="sampling-reel" aria-live="polite">
+      {% if draw_action == 'redraw' %}点击开始重抽{% elif draw_action == 'initial' %}点击开始抽样{% else %}结果已锁定{% endif %}
+    </div>
     <p id="sampling-error" role="alert"></p>
-    <form id="draw-form" method="post" action="{% url 'mobile:task-draw' task.pk %}">
-      {% csrf_token %}
-      <button id="draw-trigger" type="submit"{% if task.status != 'assigned' %} disabled{% endif %}>
-        {% if batch %}查看锁定结果{% else %}开始抽样{% endif %}
-      </button>
-    </form>
+    {% if draw_action %}
+      <form id="draw-form" method="post" action="{% url 'mobile:task-draw' task.pk %}">
+        {% csrf_token %}
+        <button id="draw-trigger" type="submit">
+          {% if draw_action == 'redraw' %}开始重抽{% else %}开始抽样{% endif %}
+        </button>
+      </form>
+    {% endif %}
     {% include "mobile/draw_result.html" %}
   </section>
 

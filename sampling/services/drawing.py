@@ -92,14 +92,14 @@ def draw_materials(*, task_id: int, actor) -> SamplingBatch:
             event_type="draw.redraw",
         )
 
-    initial_batch = (
+    latest_locked_batch = (
         task.sampling_batches.select_for_update()
-        .filter(kind=SamplingBatch.Kind.INITIAL, status=SamplingBatch.Status.LOCKED)
-        .order_by("version")
+        .filter(status=SamplingBatch.Status.LOCKED)
+        .order_by("-version")
         .first()
     )
-    if initial_batch:
-        return initial_batch
+    if latest_locked_batch:
+        return latest_locked_batch
 
     if task.sampling_batches.filter(kind=SamplingBatch.Kind.INITIAL).exists():
         raise ValueError("首次抽样批次状态异常")

@@ -1,10 +1,13 @@
+from unittest.mock import patch
+
 from django.contrib.staticfiles import finders
+from django.db.models import QuerySet
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from accounts.models import User
 from sampling.models import PersonnelAssignment, SamplingBatch, SamplingTask
-from sampling.services.drawing import draw_materials
+from sampling.services.drawing import authorize_redraw, draw_materials
 from sampling.tests.factories import SamplingFixturesMixin
 
 
@@ -116,6 +119,44 @@ class MobileTaskTests(SamplingFixturesMixin, TestCase):
         self.assertIsNotNone(first_viewed_at)
         self.assertEqual(assignment.viewed_at, first_viewed_at)
 
+    def test_detail_does_not_mark_stale_assignment_viewed_during_reassignment(self):
+        task, sampler, _ = self.make_assigned_task()
+        stale_assignment = task.personnel_assignments.get(is_current=True)
+        replacement = User.objects.create_user(
+            "race_replacement", role=User.Role.SAMPLER
+        )
+        self.client.force_login(sampler)
+        original_update = QuerySet.update
+        race_triggered = False
+
+        def reassign_before_update(queryset, **changes):
+            nonlocal race_triggered
+            if not race_triggered and "viewed_at" in changes:
+                race_triggered = True
+                original_update(
+                    PersonnelAssignment.objects.filter(pk=stale_assignment.pk),
+                    is_current=False,
+                )
+                PersonnelAssignment.objects.create(
+                    task=task,
+                    candidate_user_ids=[replacement.id],
+                    selected_user=replacement,
+                    kind=PersonnelAssignment.Kind.REASSIGN,
+                    reason="竞态复现",
+                    is_current=True,
+                    created_by=task.created_by,
+                )
+            return original_update(queryset, **changes)
+
+        with patch.object(QuerySet, "update", autospec=True, side_effect=reassign_before_update):
+            response = self.client.get(reverse("mobile:task-detail", args=[task.id]))
+
+        self.assertTrue(race_triggered)
+        self.assertEqual(response.status_code, 404)
+        stale_assignment.refresh_from_db()
+        self.assertFalse(stale_assignment.is_current)
+        self.assertIsNone(stale_assignment.viewed_at)
+
     def test_draw_response_uses_server_persisted_locked_results(self):
         task, sampler, _ = self.make_assigned_task(draw_count=2, pool_size=3)
         self.client.force_login(sampler)
@@ -164,6 +205,63 @@ class MobileTaskTests(SamplingFixturesMixin, TestCase):
         self.assertEqual(SamplingBatch.objects.filter(task=task).count(), 1)
         for result in first_payload["results"]:
             self.assertContains(detail, result["material_number"])
+
+    def test_repeat_redraw_post_returns_same_latest_locked_payload(self):
+        task, sampler, _ = self.make_assigned_task(draw_count=2, pool_size=3)
+        self.client.force_login(sampler)
+        initial_payload = self.client.post(
+            reverse("mobile:task-draw", args=[task.id])
+        ).json()
+        authorize_redraw(task_id=task.id, actor=task.created_by, reason="样品损坏")
+        redraw_payload = self.client.post(
+            reverse("mobile:task-draw", args=[task.id])
+        ).json()
+
+        repeated_payload = self.client.post(
+            reverse("mobile:task-draw", args=[task.id])
+        ).json()
+
+        self.assertEqual(initial_payload["batch_version"], 1)
+        self.assertEqual(redraw_payload["batch_version"], 2)
+        self.assertEqual(repeated_payload, redraw_payload)
+        self.assertEqual(SamplingBatch.objects.filter(task=task).count(), 2)
+        self.assertEqual(
+            sum(batch.results.count() for batch in SamplingBatch.objects.filter(task=task)),
+            task.draw_count * 2,
+        )
+
+    def test_detail_exposes_initial_draw_action_from_server_state(self):
+        task, sampler, _ = self.make_assigned_task()
+        self.client.force_login(sampler)
+
+        response = self.client.get(reverse("mobile:task-detail", args=[task.id]))
+
+        self.assertEqual(response.context["draw_action"], "initial")
+        self.assertContains(response, "开始抽样")
+
+    def test_detail_exposes_redraw_action_when_authorized_batch_is_pending(self):
+        task, sampler, _ = self.make_assigned_task()
+        draw_materials(task_id=task.id, actor=sampler)
+        authorize_redraw(task_id=task.id, actor=task.created_by, reason="样品损坏")
+        self.client.force_login(sampler)
+
+        response = self.client.get(reverse("mobile:task-detail", args=[task.id]))
+
+        self.assertEqual(response.context["draw_action"], "redraw")
+        self.assertContains(response, "开始重抽")
+        self.assertNotContains(response, "查看锁定结果")
+
+    def test_detail_with_locked_result_and_no_pending_batch_has_no_draw_action(self):
+        task, sampler, _ = self.make_assigned_task()
+        draw_materials(task_id=task.id, actor=sampler)
+        self.client.force_login(sampler)
+
+        response = self.client.get(reverse("mobile:task-detail", args=[task.id]))
+
+        self.assertIsNone(response.context["draw_action"])
+        self.assertNotContains(response, 'id="draw-form"')
+        self.assertNotContains(response, "开始抽样")
+        self.assertNotContains(response, "开始重抽")
 
     def test_completion_uses_locked_result_and_is_idempotent(self):
         task, sampler, _ = self.make_assigned_task()
