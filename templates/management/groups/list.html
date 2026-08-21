@@ -1,6 +1,6 @@
-<!doctype html>
-<html lang="zh-CN">
-<body>
+{% extends "management/base.html" %}
+{% block title %}人员分组 - 随机抽样{% endblock %}
+{% block content %}
   <h1>人员分组</h1>
   <a href="{% url 'personnel:group-create' %}">新建分组</a>
   <ul>
@@ -13,5 +13,4 @@
       <li>暂无分组</li>
     {% endfor %}
   </ul>
-</body>
-</html>
+{% endblock %}

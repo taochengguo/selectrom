@@ -1,0 +1,73 @@
+{% extends "management/base.html" %}
+{% block title %}{{ task.task_number }} - 随机抽样{% endblock %}
+{% block content %}
+  <section>
+    <h2>{{ task.task_number }} · {{ task.name }}</h2>
+    <p>状态：{{ task.get_status_display }}　抽样组：{{ task.personnel_group.name }}　抽取数量：{{ task.draw_count }}</p>
+    <p>计划时间：{{ task.planned_at|default:"未设置" }}　备注：{{ task.notes|default:"无" }}</p>
+    <a href="{% url 'management:task-edit' task.pk %}">编辑任务</a>
+    {% if task.status == 'draft' or task.status == 'ready' %}<a href="{% url 'management:task-import' task.pk %}">CSV 导入</a>{% endif %}
+    {% if task.status == 'draft' %}
+      <form method="post" action="{% url 'management:task-ready' task.pk %}">{% csrf_token %}<button type="submit">设为待执行</button></form>
+    {% endif %}
+    {% if task.status == 'ready' %}
+      <form method="post" action="{% url 'management:task-execute' task.pk %}">{% csrf_token %}<button type="submit">执行并随机分配</button></form>
+    {% endif %}
+    {% if task.status == 'assigned' %}
+      <form method="post" action="{% url 'management:task-reassign' task.pk %}">
+        {% csrf_token %}<label>重新分配原因 <input name="reason" required></label><button type="submit">重新分配</button>
+      </form>
+    {% endif %}
+    {% if task.status == 'in_progress' or task.status == 'completed' %}
+      <form method="post" action="{% url 'management:task-authorize-redraw' task.pk %}">
+        {% csrf_token %}<label>重抽原因 <input name="reason" required></label><button type="submit">批准重抽</button>
+      </form>
+    {% endif %}
+    {% if task.status != 'cancelled' %}
+      <form method="post" action="{% url 'management:task-cancel' task.pk %}">{% csrf_token %}<button type="submit">取消任务</button></form>
+    {% endif %}
+  </section>
+
+  <section>
+    <h3>候选物资（{{ task.candidates.count }}）</h3>
+    {% if task.status == 'draft' or task.status == 'ready' %}
+      <form method="post" action="{% url 'management:task-candidate-add' task.pk %}">
+        {% csrf_token %}{{ candidate_form.as_p }}<button type="submit">逐条添加</button>
+      </form>
+    {% endif %}
+    <table>
+      <thead><tr><th>物资编号</th><th>订单号</th><th>供应商</th><th>物资名称</th><th>数量</th><th>操作</th></tr></thead>
+      <tbody>{% for material in task.candidates.all %}<tr>
+        <td>{{ material.material_number }}</td><td>{{ material.order_number }}</td><td>{{ material.supplier }}</td><td>{{ material.material_name }}</td><td>{{ material.quantity }}</td>
+        <td>{% if task.status == 'draft' or task.status == 'ready' %}<form method="post" action="{% url 'management:task-candidate-delete' material.pk %}">{% csrf_token %}<button type="submit">删除</button></form>{% else %}已冻结{% endif %}</td>
+      </tr>{% empty %}<tr><td colspan="6">暂无候选物资</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h3>人员分配历史</h3>
+    <table><thead><tr><th>类型</th><th>选中人员</th><th>候选人员快照</th><th>原因</th><th>状态</th><th>时间</th></tr></thead><tbody>
+    {% for assignment in task.personnel_assignments.all %}<tr>
+      <td>{{ assignment.get_kind_display }}</td><td>{{ assignment.selected_user.username }}</td><td>{{ assignment.candidate_user_ids }}</td><td>{{ assignment.reason|default:"-" }}</td><td>{% if assignment.is_current %}当前{% else %}历史{% endif %}</td><td>{{ assignment.created_at }}</td>
+    </tr>{% empty %}<tr><td colspan="6">尚未分配</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+
+  <section>
+    <h3>抽样批次与结果</h3>
+    {% for batch in task.sampling_batches.all %}
+      <article>
+        <h4>版本 {{ batch.version }} · {{ batch.get_kind_display }} · {{ batch.get_status_display }}</h4>
+        {% if batch.reason %}<p>原因：{{ batch.reason }}</p>{% endif %}
+        <ol>{% for result in batch.results.all %}<li>{{ result.material.material_number }} · {{ result.material.order_number }} · {{ result.material.supplier }} · {{ result.material.material_name }} · {{ result.material.quantity }}</li>{% empty %}<li>等待抽样人员执行</li>{% endfor %}</ol>
+      </article>
+    {% empty %}<p>暂无抽样批次</p>{% endfor %}
+  </section>
+
+  <section>
+    <h3>任务审计时间线</h3>
+    <table><thead><tr><th>时间</th><th>事件</th><th>操作人</th><th>变更前</th><th>变更后</th></tr></thead><tbody>
+    {% for log in task.audit_logs.all %}<tr><td>{{ log.created_at }}</td><td>{{ log.event_type }}</td><td>{{ log.actor.username }}</td><td>{{ log.before_data }}</td><td>{{ log.after_data }}</td></tr>{% empty %}<tr><td colspan="5">暂无任务日志</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+{% endblock %}

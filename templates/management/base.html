@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}随机抽样管理后台{% endblock %}</title>
+</head>
+<body>
+  <aside aria-label="管理导航">
+    <h1>随机抽样</h1>
+    <nav>
+      <a href="{% url 'management:dashboard' %}">工作台</a>
+      <a href="{% url 'management:task-list' %}">抽样任务</a>
+      <a href="{% url 'personnel:group-list' %}">人员分组</a>
+      <a href="{% url 'management:user-list' %}">用户管理</a>
+      <a href="{% url 'management:log-list' %}">系统日志</a>
+    </nav>
+  </aside>
+  <main>
+    <header>
+      <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+      <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button type="submit">退出登录</button>
+      </form>
+    </header>
+    {% if messages %}
+      <section aria-label="操作提示">
+        {% for message in messages %}<p class="message {{ message.tags }}">{{ message }}</p>{% endfor %}
+      </section>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
