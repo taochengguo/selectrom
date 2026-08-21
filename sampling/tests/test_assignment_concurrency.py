@@ -1,7 +1,7 @@
 import threading
 from unittest.mock import patch
 
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, transaction
 from django.test import TransactionTestCase
 
 from accounts.models import User
@@ -29,35 +29,83 @@ class AssignmentConcurrencyTests(TransactionTestCase):
             status=SamplingTask.Status.READY,
             created_by=admin,
         )
-        start = threading.Barrier(2)
-        outcomes = []
+        lock_held = threading.Event()
+        second_started = threading.Event()
+        outcomes = {}
         outcomes_lock = threading.Lock()
 
-        def attempt_assignment():
+        def record_outcome(worker, outcome):
+            with outcomes_lock:
+                outcomes[worker] = outcome
+
+        def first_attempt():
             close_old_connections()
             try:
-                start.wait()
-                with patch("sampling.services.assignment.secrets.choice", return_value=sampler.id):
+                with transaction.atomic():
+                    SamplingTask.objects.select_for_update().get(pk=task.id)
+                    lock_held.set()
+                    if not second_started.wait(timeout=5):
+                        raise AssertionError("second worker did not start assignment")
+                    with patch(
+                        "sampling.services.assignment.secrets.choice",
+                        return_value=sampler.id,
+                    ):
+                        assignment = assign_sampler(task_id=task.id, actor=admin)
+                outcome = ("success", assignment.id)
+            except ValueError as error:
+                outcome = ("state_error", str(error))
+            except BaseException as error:
+                outcome = ("unexpected_error", repr(error))
+            finally:
+                close_old_connections()
+            record_outcome("first", outcome)
+
+        def second_attempt():
+            close_old_connections()
+            try:
+                if not lock_held.wait(timeout=5):
+                    raise AssertionError("first worker did not acquire the task lock")
+
+                def signal_task_lock_query(execute, sql, params, many, context):
+                    if (
+                        "sampling_samplingtask" in sql
+                        and "FOR UPDATE" in sql.upper()
+                    ):
+                        second_started.set()
+                    return execute(sql, params, many, context)
+
+                with patch(
+                    "sampling.services.assignment.secrets.choice", return_value=sampler.id
+                ), connection.execute_wrapper(signal_task_lock_query):
                     assignment = assign_sampler(task_id=task.id, actor=admin)
                 outcome = ("success", assignment.id)
             except ValueError as error:
                 outcome = ("state_error", str(error))
+            except BaseException as error:
+                outcome = ("unexpected_error", repr(error))
             finally:
                 close_old_connections()
-            with outcomes_lock:
-                outcomes.append(outcome)
+            record_outcome("second", outcome)
 
-        workers = [threading.Thread(target=attempt_assignment) for _ in range(2)]
+        workers = [
+            threading.Thread(target=first_attempt),
+            threading.Thread(target=second_attempt),
+        ]
         for worker in workers:
             worker.start()
         for worker in workers:
             worker.join(timeout=10)
 
         self.assertTrue(all(not worker.is_alive() for worker in workers))
-        self.assertEqual(sorted(outcome[0] for outcome in outcomes), ["state_error", "success"])
+        self.assertEqual(set(outcomes), {"first", "second"})
+        self.assertEqual(outcomes["first"][0], "success")
+        self.assertEqual(outcomes["second"][0], "state_error")
         self.assertEqual(
             PersonnelAssignment.objects.filter(
                 task=task, kind=PersonnelAssignment.Kind.INITIAL
             ).count(),
             1,
         )
+        self.assertEqual(PersonnelAssignment.objects.filter(task=task, is_current=True).count(), 1)
+        task.refresh_from_db()
+        self.assertEqual(task.status, SamplingTask.Status.ASSIGNED)
