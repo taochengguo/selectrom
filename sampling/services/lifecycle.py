@@ -54,6 +54,7 @@ def _candidate_data(candidate):
 
 
 def _ensure_candidate_mutable(task):
+    # Candidate IDs are the frozen draw pool once a task has been assigned.
     if task.status not in _MUTABLE_TASK_STATUSES:
         raise TaskFrozenError("任务已执行，候选物资不可修改")
 
