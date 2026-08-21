@@ -5,24 +5,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}随机抽样{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/mobile.css' %}">
 </head>
-<body>
-  <header>
-    <h1>{% block page_title %}随机抽样{% endblock %}</h1>
-  </header>
-  {% if messages %}
-    <section aria-label="操作提示">
-      {% for message in messages %}<p class="message {{ message.tags }}">{{ message }}</p>{% endfor %}
-    </section>
-  {% endif %}
-  <main>
-    {% block content %}{% endblock %}
-  </main>
-  <nav aria-label="手机端主导航">
-    <a href="{% url 'mobile:dashboard' %}">随机抽样</a>
-    <a href="{% url 'mobile:reminders' %}">任务提醒</a>
-    <a href="{% url 'mobile:profile' %}">个人中心</a>
-  </nav>
+<body class="mobile-body">
+  <div class="mobile-shell">
+    <header class="mobile-header">
+      <h1>{% block page_title %}随机抽样{% endblock %}</h1>
+    </header>
+    {% if messages %}
+      <section class="mobile-messages" aria-label="操作提示">
+        {% for message in messages %}<p class="message {{ message.tags }}">{{ message }}</p>{% endfor %}
+      </section>
+    {% endif %}
+    <main class="mobile-main">
+      {% block content %}{% endblock %}
+    </main>
+    {% with url_name=request.resolver_match.url_name %}
+      <nav class="mobile-bottom-nav" aria-label="手机端主导航">
+        <a class="mobile-tab{% if url_name == 'dashboard' %} is-active{% endif %}" href="{% url 'mobile:dashboard' %}"{% if url_name == 'dashboard' %} aria-current="page"{% endif %}>随机抽样</a>
+        <a class="mobile-tab{% if url_name == 'reminders' or url_name == 'task-detail' %} is-active{% endif %}" href="{% url 'mobile:reminders' %}"{% if url_name == 'reminders' or url_name == 'task-detail' %} aria-current="page"{% endif %}>任务提醒</a>
+        <a class="mobile-tab{% if url_name == 'profile' %} is-active{% endif %}" href="{% url 'mobile:profile' %}"{% if url_name == 'profile' %} aria-current="page"{% endif %}>个人中心</a>
+      </nav>
+    {% endwith %}
+  </div>
   {% block scripts %}{% endblock %}
 </body>
 </html>

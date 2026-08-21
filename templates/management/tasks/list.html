@@ -1,27 +1,33 @@
 {% extends "management/base.html" %}
 {% block title %}抽样任务 - 随机抽样{% endblock %}
 {% block content %}
-  <h2>抽样任务</h2>
-  <a href="{% url 'management:task-create' %}">创建任务</a>
-  <form method="get">
-    <label>状态
-      <select name="status">
-        <option value="">全部状态</option>
-        {% for value,label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
-    </label>
-    <button type="submit">筛选</button>
-  </form>
-  <table>
-    <thead><tr><th>任务编号</th><th>任务名称</th><th>抽样组</th><th>抽取数量</th><th>状态</th><th>操作</th></tr></thead>
-    <tbody>
-    {% for task in tasks %}
-      <tr>
-        <td>{{ task.task_number }}</td><td>{{ task.name }}</td><td>{{ task.personnel_group.name }}</td>
-        <td>{{ task.draw_count }}</td><td>{{ task.get_status_display }}</td>
-        <td><a href="{% url 'management:task-detail' task.pk %}">查看详情</a></td>
-      </tr>
-    {% empty %}<tr><td colspan="6">暂无任务</td></tr>{% endfor %}
-    </tbody>
-  </table>
+  <section class="page-card">
+    <div class="page-heading">
+      <div><h2>抽样任务</h2><p>创建、筛选并跟踪任务状态</p></div>
+      <a class="button" href="{% url 'management:task-create' %}">创建任务</a>
+    </div>
+    <form class="filter-row" method="get">
+      <label>状态
+        <select name="status">
+          <option value="">全部状态</option>
+          {% for value,label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <button type="submit">筛选</button>
+    </form>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>任务编号</th><th>任务名称</th><th>抽样组</th><th>抽取数量</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+        {% for task in tasks %}
+          <tr>
+            <td>{{ task.task_number }}</td><td>{{ task.name }}</td><td>{{ task.personnel_group.name }}</td>
+            <td>{{ task.draw_count }}</td><td><span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span></td>
+            <td><a href="{% url 'management:task-detail' task.pk %}">查看详情</a></td>
+          </tr>
+        {% empty %}<tr><td colspan="6">暂无任务</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 {% endblock %}

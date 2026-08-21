@@ -1,17 +1,24 @@
+{% load static %}
 <!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>登录</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/management.css' %}">
 </head>
-<body>
-  <main>
-    <h1>随机抽样系统登录</h1>
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit">登录</button>
-    </form>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <h1>随机抽样系统</h1>
+      <p class="auth-card__intro">请使用您的系统账号登录</p>
+      <form class="form-card" method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">登录</button>
+      </form>
+    </section>
   </main>
 </body>
 </html>

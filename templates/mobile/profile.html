@@ -4,22 +4,27 @@
 {% block page_title %}个人中心{% endblock %}
 
 {% block content %}
-  <section>
-    <p>账号：{{ request.user.username }}</p>
-    <form method="post" enctype="multipart/form-data">
+  <section class="mobile-card">
+    <div class="section-heading"><h2>个人信息</h2></div>
+    <p class="profile-account">账号：{{ request.user.username }}</p>
+    <form class="mobile-form" method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <input type="hidden" name="action" value="update_profile">
       {{ form.as_p }}
       <button type="submit">保存</button>
     </form>
-    <h2>修改密码</h2>
-    <form method="post">
+  </section>
+  <section class="mobile-card">
+    <div class="section-heading"><h2>修改密码</h2></div>
+    <form class="mobile-form" method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="change_password">
       {{ password_form.as_p }}
       <button type="submit">更新密码</button>
     </form>
-    <form method="post" action="{% url 'accounts:logout' %}">
+  </section>
+  <section class="mobile-card">
+    <form class="mobile-form" method="post" action="{% url 'accounts:logout' %}">
       {% csrf_token %}
       <button type="submit">退出登录</button>
     </form>

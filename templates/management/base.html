@@ -1,35 +1,50 @@
+{% load static %}
 <!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}随机抽样管理后台{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/management.css' %}">
 </head>
-<body>
-  <aside aria-label="管理导航">
-    <h1>随机抽样</h1>
-    <nav>
-      <a href="{% url 'management:dashboard' %}">工作台</a>
-      <a href="{% url 'management:task-list' %}">抽样任务</a>
-      <a href="{% url 'personnel:group-list' %}">人员分组</a>
-      <a href="{% url 'management:user-list' %}">用户管理</a>
-      <a href="{% url 'management:log-list' %}">系统日志</a>
-    </nav>
-  </aside>
-  <main>
-    <header>
-      <span>{{ request.user.get_full_name|default:request.user.username }}</span>
-      <form method="post" action="{% url 'accounts:logout' %}">
-        {% csrf_token %}
-        <button type="submit">退出登录</button>
-      </form>
-    </header>
-    {% if messages %}
-      <section aria-label="操作提示">
-        {% for message in messages %}<p class="message {{ message.tags }}">{{ message }}</p>{% endfor %}
-      </section>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
+<body class="management-body">
+  <div class="management-shell">
+    {% with url_name=request.resolver_match.url_name namespace=request.resolver_match.namespace %}
+      <aside class="management-sidebar" aria-label="管理导航">
+        <a class="brand-lockup" href="{% url 'management:dashboard' %}">
+          <span class="brand-lockup__name">随机抽样</span>
+          <span class="brand-lockup__caption">管理后台</span>
+        </a>
+        <nav class="management-nav">
+          <a href="{% url 'management:dashboard' %}"{% if namespace == 'management' and url_name == 'dashboard' %} class="is-active" aria-current="page"{% endif %}>工作台</a>
+          <a href="{% url 'management:task-list' %}"{% if namespace == 'management' and 'task-' in url_name %} class="is-active" aria-current="page"{% endif %}>抽样任务</a>
+          <a href="{% url 'personnel:group-list' %}"{% if namespace == 'personnel' %} class="is-active" aria-current="page"{% endif %}>人员分组</a>
+          <a href="{% url 'management:user-list' %}"{% if namespace == 'management' and 'user-' in url_name %} class="is-active" aria-current="page"{% endif %}>用户管理</a>
+          <a href="{% url 'management:log-list' %}"{% if namespace == 'management' and url_name == 'log-list' %} class="is-active" aria-current="page"{% endif %}>系统日志</a>
+        </nav>
+      </aside>
+    {% endwith %}
+    <div class="management-main">
+      <header class="management-topbar">
+        <div class="management-user">
+          <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+          <span>管理员</span>
+        </div>
+        <form method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button type="submit">退出登录</button>
+        </form>
+      </header>
+      <main class="management-content">
+        {% if messages %}
+          <section class="management-messages" aria-label="操作提示">
+            {% for message in messages %}<p class="message {{ message.tags }}">{{ message }}</p>{% endfor %}
+          </section>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
 </body>
 </html>

@@ -5,11 +5,13 @@
 {% block page_title %}任务详情{% endblock %}
 
 {% block content %}
-  <article>
-    <h2>{{ task.name }}</h2>
-    <dl>
+  <article class="mobile-card">
+    <div class="section-heading">
+      <h2>{{ task.name }}</h2>
+      <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span>
+    </div>
+    <dl class="detail-list">
       <div><dt>任务编号</dt><dd>{{ task.task_number }}</dd></div>
-      <div><dt>任务状态</dt><dd>{{ task.get_status_display }}</dd></div>
       <div><dt>候选物资</dt><dd>{{ candidate_count }} 个</dd></div>
       <div><dt>抽取数量</dt><dd>{{ task.draw_count }} 个</dd></div>
       <div><dt>计划时间</dt><dd>{{ task.planned_at|date:"Y-m-d H:i"|default:"未设置" }}</dd></div>
@@ -17,8 +19,11 @@
     </dl>
   </article>
 
-  <section aria-labelledby="draw-heading">
-    <h2 id="draw-heading">抽样结果</h2>
+  <section class="sampling-stage mobile-card" aria-labelledby="draw-heading">
+    <div class="section-heading">
+      <h2 id="draw-heading">抽样结果</h2>
+      {% if batch %}<span class="status-chip status-completed">已锁定</span>{% endif %}
+    </div>
     <div id="sampling-reel" aria-live="polite">
       {% if draw_action == 'redraw' %}点击开始重抽{% elif draw_action == 'initial' %}点击开始抽样{% else %}结果已锁定{% endif %}
     </div>
@@ -35,10 +40,12 @@
   </section>
 
   {% if task.status == 'in_progress' %}
-    <form method="post" action="{% url 'mobile:task-complete' task.pk %}">
-      {% csrf_token %}
-      <button type="submit">确认完成</button>
-    </form>
+    <section class="mobile-card mobile-actions" aria-label="任务操作">
+      <form method="post" action="{% url 'mobile:task-complete' task.pk %}">
+        {% csrf_token %}
+        <button type="submit">确认完成</button>
+      </form>
+    </section>
   {% endif %}
 {% endblock %}
 

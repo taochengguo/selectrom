@@ -1,16 +1,19 @@
 {% extends "management/base.html" %}
 {% block title %}人员分组 - 随机抽样{% endblock %}
 {% block content %}
-  <h1>人员分组</h1>
-  <a href="{% url 'personnel:group-create' %}">新建分组</a>
-  <ul>
-    {% for group in groups %}
-      <li>
-        {{ group.name }}
-        <a href="{% url 'personnel:group-edit' group.pk %}">编辑</a>
-      </li>
-    {% empty %}
-      <li>暂无分组</li>
-    {% endfor %}
-  </ul>
+  <section class="page-card">
+    <div class="page-heading">
+      <div><h1>人员分组</h1><p>随机分配将从所选分组的全部当前成员中抽取一人</p></div>
+      <a class="button" href="{% url 'personnel:group-create' %}">新建分组</a>
+    </div>
+    <ul class="group-list">
+      {% for group in groups %}
+        <li class="group-card">
+          <div class="page-heading"><strong>{{ group.name }}</strong><a class="button button--secondary" href="{% url 'personnel:group-edit' group.pk %}">编辑</a></div>
+        </li>
+      {% empty %}
+        <li class="empty-state">暂无分组</li>
+      {% endfor %}
+    </ul>
+  </section>
 {% endblock %}

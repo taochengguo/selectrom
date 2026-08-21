@@ -1,0 +1,227 @@
+:root {
+  color-scheme: light;
+  --color-primary: #246bfd;
+  --color-primary-strong: #1555dc;
+  --color-primary-soft: #eaf2ff;
+  --color-text: #10234a;
+  --color-text-strong: #091832;
+  --color-text-muted: #6d7c96;
+  --color-success: #19ad61;
+  --color-success-soft: #e9f8f0;
+  --color-warning: #ff8d2b;
+  --color-warning-soft: #fff2e7;
+  --color-accent-purple: #7357f6;
+  --color-accent-purple-soft: #f0edff;
+  --color-danger: #d74444;
+  --color-danger-soft: #fff0f0;
+  --color-surface-page: #f4f7fb;
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: #f8faff;
+  --color-border: #e3e9f2;
+  --gradient-primary: linear-gradient(135deg, #2f79ff 0%, #1764ef 100%);
+  --shadow-card: 0 10px 30px rgba(25, 59, 111, 0.09);
+  --shadow-raised: 0 14px 34px rgba(35, 105, 240, 0.18);
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --interactive-min-size: 44px;
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--color-surface-page);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface-page);
+  color: var(--color-text);
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+button,
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+
+button,
+[type="submit"],
+[role="button"],
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-primary-strong);
+}
+
+:focus-visible {
+  outline: 3px solid rgba(36, 107, 253, 0.32);
+  outline-offset: 3px;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+dl,
+dd {
+  margin-top: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.message {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-card);
+  color: var(--color-text);
+}
+
+.message.success {
+  border-color: #bfe8d1;
+  background: var(--color-success-soft);
+  color: #08753d;
+}
+
+.message.error {
+  border-color: #f3c1c1;
+  background: var(--color-danger-soft);
+  color: #a32c2c;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #edf1f6;
+  color: #56627a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-assigned {
+  background: var(--color-warning-soft);
+  color: #b85b0b;
+}
+
+.status-in_progress {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
+
+.status-completed,
+.status-current,
+.status-active {
+  background: var(--color-success-soft);
+  color: #087b40;
+}
+
+.status-cancelled,
+.status-inactive {
+  background: #edf0f4;
+  color: #505969;
+}
+
+.button,
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--interactive-min-size);
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--gradient-primary);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.button:hover,
+button:hover {
+  color: #fff;
+  box-shadow: var(--shadow-raised);
+  transform: translateY(-1px);
+}
+
+.button--secondary {
+  border-color: var(--color-border);
+  background: var(--color-surface-card);
+  color: var(--color-text);
+}
+
+.button--secondary:hover {
+  color: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(25, 59, 111, 0.1);
+}
+
+.button--danger {
+  border-color: #f0c8c8;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.button--danger:hover {
+  color: #b22525;
+  box-shadow: 0 8px 20px rgba(215, 68, 68, 0.12);
+}
+
+button:disabled,
+.button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}

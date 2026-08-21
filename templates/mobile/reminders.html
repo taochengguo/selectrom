@@ -4,29 +4,43 @@
 {% block page_title %}任务提醒{% endblock %}
 
 {% block content %}
-  <form method="get">
-    <label for="status">任务状态</label>
-    <select id="status" name="status">
-      <option value="">全部</option>
-      {% for value, label in status_choices %}
-        <option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit">筛选</button>
-  </form>
+  <section class="mobile-card" aria-labelledby="reminder-filter-heading">
+    <div class="section-heading">
+      <h2 id="reminder-filter-heading">任务筛选</h2>
+    </div>
+    <form class="filter-form" method="get">
+      <div class="field-group">
+        <label for="status">任务状态</label>
+        <select id="status" name="status">
+          <option value="">全部</option>
+          {% for value, label in status_choices %}
+            <option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit">筛选</button>
+    </form>
+  </section>
 
-  <section aria-label="任务列表">
-    {% for task, assignment in task_rows %}
-      <article>
-        <a href="{% url 'mobile:task-detail' task.pk %}">
-          <strong>{{ task.name }}</strong>
-          <span>{{ task.task_number }}</span>
-          <span>{{ task.get_status_display }}</span>
-          {% if not assignment.viewed_at %}<span>未读</span>{% endif %}
-        </a>
-      </article>
-    {% empty %}
-      <p>当前筛选条件下暂无任务</p>
-    {% endfor %}
+  <section class="mobile-card" aria-labelledby="reminder-list-heading">
+    <div class="section-heading">
+      <h2 id="reminder-list-heading">任务列表</h2>
+    </div>
+    <div class="task-list">
+      {% for task, assignment in task_rows %}
+        <article class="task-card">
+          <a class="task-card__link" href="{% url 'mobile:task-detail' task.pk %}">
+            <strong class="task-card__title">{{ task.name }}</strong>
+            <span class="task-card__meta">{{ task.task_number }}</span>
+            <span class="task-card__flags">
+              <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span>
+              {% if not assignment.viewed_at %}<span class="unread-badge">未读</span>{% endif %}
+            </span>
+          </a>
+        </article>
+      {% empty %}
+        <p class="empty-state">当前筛选条件下暂无任务</p>
+      {% endfor %}
+    </div>
   </section>
 {% endblock %}

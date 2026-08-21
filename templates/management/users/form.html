@@ -1,7 +1,11 @@
 {% extends "management/base.html" %}
 {% block title %}{% if managed_user %}编辑用户{% else %}创建用户{% endif %} - 随机抽样{% endblock %}
 {% block content %}
-  <h2>{% if managed_user %}编辑用户{% else %}创建用户{% endif %}</h2>
-  <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">保存</button></form>
-  <a href="{% url 'management:user-list' %}">返回用户列表</a>
+  <section class="page-card">
+    <div class="page-heading"><div><h2>{% if managed_user %}编辑用户{% else %}创建用户{% endif %}</h2><p>维护账号角色、资料与启用状态</p></div></div>
+    <form class="form-card" method="post">
+      {% csrf_token %}{{ form.as_p }}
+      <div class="inline-actions"><button type="submit">保存</button><a class="button button--secondary" href="{% url 'management:user-list' %}">返回用户列表</a></div>
+    </form>
+  </section>
 {% endblock %}

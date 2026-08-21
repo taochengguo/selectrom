@@ -1,13 +1,20 @@
 {% extends "management/base.html" %}
 {% block title %}导入候选物资 - 随机抽样{% endblock %}
 {% block content %}
-  <h2>导入候选物资</h2>
-  <p>任务：{{ task.task_number }} {{ task.name }}</p>
-  <p>CSV 表头：物资编号、订单号、供应商、物资名称、物资数量。文件须使用 UTF-8 编码，任意一行错误时整批不会写入。</p>
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    <label>CSV 文件 <input type="file" name="csv_file" accept=".csv,text/csv" required></label>
-    <button type="submit">开始导入</button>
-  </form>
-  <a href="{% url 'management:task-detail' task.pk %}">返回任务详情</a>
+  <section class="page-card">
+    <div class="page-heading">
+      <div><h2>导入候选物资</h2><p>任务：{{ task.task_number }} {{ task.name }}</p></div>
+    </div>
+    <div class="action-panel">
+      <p>CSV 表头：物资编号、订单号、供应商、物资名称、物资数量。文件须使用 UTF-8 编码，任意一行错误时整批不会写入。</p>
+      <form class="form-card" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label>CSV 文件 <input type="file" name="csv_file" accept=".csv,text/csv" required></label>
+        <div class="inline-actions">
+          <button type="submit">开始导入</button>
+          <a class="button button--secondary" href="{% url 'management:task-detail' task.pk %}">返回任务详情</a>
+        </div>
+      </form>
+    </div>
+  </section>
 {% endblock %}

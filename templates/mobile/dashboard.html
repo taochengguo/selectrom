@@ -1,32 +1,48 @@
 {% extends "mobile/base.html" %}
+{% load static %}
 
 {% block title %}随机抽样{% endblock %}
 {% block page_title %}随机抽样{% endblock %}
 
 {% block content %}
-  <section aria-labelledby="today-heading">
-    <h2 id="today-heading">今日抽样任务</h2>
-    <dl>
-      <div><dt>任务总数</dt><dd>{{ summary.total }}</dd></div>
-      <div><dt>待抽样</dt><dd>{{ summary.assigned }}</dd></div>
-      <div><dt>进行中</dt><dd>{{ summary.in_progress }}</dd></div>
-      <div><dt>已完成</dt><dd>{{ summary.completed }}</dd></div>
-    </dl>
-    <a href="{% url 'mobile:reminders' %}">开始抽样</a>
+  <section class="mobile-hero" aria-labelledby="hero-heading" style="background-image: url('{% static 'img/sampling-hero.png' %}')">
+    <div class="mobile-hero__copy">
+      <h2 id="hero-heading">随机抽样</h2>
+      <p>公平公正 · 科学抽样 · 规范透明</p>
+    </div>
   </section>
 
-  <section aria-labelledby="recent-heading">
-    <h2 id="recent-heading">最近抽样记录</h2>
-    {% for task in recent_tasks %}
-      <article>
-        <a href="{% url 'mobile:task-detail' task.pk %}">
-          <strong>{{ task.name }}</strong>
-          <span>{{ task.task_number }}</span>
-          <span>{{ task.get_status_display }}</span>
-        </a>
-      </article>
-    {% empty %}
-      <p>暂无抽样任务</p>
-    {% endfor %}
+  <section class="mobile-card" aria-labelledby="today-heading">
+    <div class="section-heading">
+      <h2 id="today-heading">今日抽样任务</h2>
+      <a class="section-heading__link" href="{% url 'mobile:reminders' %}">查看任务</a>
+    </div>
+    <dl class="summary-grid">
+      <div class="summary-item"><dt>任务总数</dt><dd>{{ summary.total }}</dd></div>
+      <div class="summary-item"><dt>待抽样</dt><dd>{{ summary.assigned }}</dd></div>
+      <div class="summary-item"><dt>进行中</dt><dd>{{ summary.in_progress }}</dd></div>
+      <div class="summary-item"><dt>已完成</dt><dd>{{ summary.completed }}</dd></div>
+    </dl>
+    <a class="primary-action" href="{% url 'mobile:reminders' %}">开始抽样</a>
+  </section>
+
+  <section class="mobile-card" aria-labelledby="recent-heading">
+    <div class="section-heading">
+      <h2 id="recent-heading">最近抽样记录</h2>
+      <a class="section-heading__link" href="{% url 'mobile:reminders' %}">全部记录</a>
+    </div>
+    <div class="task-list">
+      {% for task in recent_tasks %}
+        <article class="task-card">
+          <a class="task-card__link" href="{% url 'mobile:task-detail' task.pk %}">
+            <strong class="task-card__title">{{ task.name }}</strong>
+            <span class="task-card__meta">{{ task.task_number }}</span>
+            <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span>
+          </a>
+        </article>
+      {% empty %}
+        <p class="empty-state">暂无抽样任务</p>
+      {% endfor %}
+    </div>
   </section>
 {% endblock %}
