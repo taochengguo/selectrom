@@ -1,0 +1,16 @@
+<div id="sampling-results" aria-live="polite">
+  {% for result in results %}
+    <article>
+      <h3>{{ result.material.material_number }}</h3>
+      <dl>
+        <div><dt>订单号</dt><dd>{{ result.material.order_number }}</dd></div>
+        <div><dt>供应商</dt><dd>{{ result.material.supplier }}</dd></div>
+        <div><dt>物资名称</dt><dd>{{ result.material.material_name }}</dd></div>
+        <div><dt>物资数量</dt><dd>{{ result.material.quantity }}</dd></div>
+        <div><dt>抽样数量</dt><dd>{{ task.draw_count }}</dd></div>
+      </dl>
+    </article>
+  {% empty %}
+    <p>尚未生成抽样结果</p>
+  {% endfor %}
+</div>

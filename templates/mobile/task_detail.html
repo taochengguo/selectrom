@@ -1,0 +1,68 @@
+{% extends "mobile/base.html" %}
+{% load static %}
+
+{% block title %}{{ task.name }}{% endblock %}
+{% block page_title %}任务详情{% endblock %}
+
+{% block content %}
+  <article>
+    <h2>{{ task.name }}</h2>
+    <dl>
+      <div><dt>任务编号</dt><dd>{{ task.task_number }}</dd></div>
+      <div><dt>任务状态</dt><dd>{{ task.get_status_display }}</dd></div>
+      <div><dt>候选物资</dt><dd>{{ candidate_count }} 个</dd></div>
+      <div><dt>抽取数量</dt><dd>{{ task.draw_count }} 个</dd></div>
+      <div><dt>计划时间</dt><dd>{{ task.planned_at|date:"Y-m-d H:i"|default:"未设置" }}</dd></div>
+      <div><dt>任务备注</dt><dd>{{ task.notes|default:"无" }}</dd></div>
+    </dl>
+  </article>
+
+  <section aria-labelledby="draw-heading">
+    <h2 id="draw-heading">抽样结果</h2>
+    <div id="sampling-reel" aria-live="polite">点击开始抽样</div>
+    <p id="sampling-error" role="alert"></p>
+    <form id="draw-form" method="post" action="{% url 'mobile:task-draw' task.pk %}">
+      {% csrf_token %}
+      <button id="draw-trigger" type="submit"{% if task.status != 'assigned' %} disabled{% endif %}>
+        {% if batch %}查看锁定结果{% else %}开始抽样{% endif %}
+      </button>
+    </form>
+    {% include "mobile/draw_result.html" %}
+  </section>
+
+  {% if task.status == 'in_progress' %}
+    <form method="post" action="{% url 'mobile:task-complete' task.pk %}">
+      {% csrf_token %}
+      <button type="submit">确认完成</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script type="module">
+    import { runSamplingAnimation } from "{% static 'js/sampling-animation.js' %}";
+
+    const form = document.querySelector("#draw-form");
+    const trigger = document.querySelector("#draw-trigger");
+    if (form && trigger && !trigger.disabled) {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const errorBox = document.querySelector("#sampling-error");
+        errorBox.textContent = "";
+        try {
+          await runSamplingAnimation({
+            trigger,
+            reel: document.querySelector("#sampling-reel"),
+            resultList: document.querySelector("#sampling-results"),
+            endpoint: form.action,
+            csrfToken: form.querySelector("[name=csrfmiddlewaretoken]").value,
+          });
+          window.location.reload();
+        } catch (error) {
+          errorBox.textContent = error.message;
+          trigger.disabled = false;
+        }
+      });
+    }
+  </script>
+{% endblock %}

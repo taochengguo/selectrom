@@ -1,0 +1,32 @@
+{% extends "mobile/base.html" %}
+
+{% block title %}随机抽样{% endblock %}
+{% block page_title %}随机抽样{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="today-heading">
+    <h2 id="today-heading">今日抽样任务</h2>
+    <dl>
+      <div><dt>任务总数</dt><dd>{{ summary.total }}</dd></div>
+      <div><dt>待抽样</dt><dd>{{ summary.assigned }}</dd></div>
+      <div><dt>进行中</dt><dd>{{ summary.in_progress }}</dd></div>
+      <div><dt>已完成</dt><dd>{{ summary.completed }}</dd></div>
+    </dl>
+    <a href="{% url 'mobile:reminders' %}">开始抽样</a>
+  </section>
+
+  <section aria-labelledby="recent-heading">
+    <h2 id="recent-heading">最近抽样记录</h2>
+    {% for task in recent_tasks %}
+      <article>
+        <a href="{% url 'mobile:task-detail' task.pk %}">
+          <strong>{{ task.name }}</strong>
+          <span>{{ task.task_number }}</span>
+          <span>{{ task.get_status_display }}</span>
+        </a>
+      </article>
+    {% empty %}
+      <p>暂无抽样任务</p>
+    {% endfor %}
+  </section>
+{% endblock %}
