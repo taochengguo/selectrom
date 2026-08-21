@@ -80,6 +80,52 @@ class ManagementViewTests(TestCase):
         self.assertEqual(task.name, "修改后的任务")
         self.assertTrue(TaskAuditLog.objects.filter(task=task, event_type="task.updated").exists())
 
+    def test_executed_task_edit_sends_only_changed_nonprotected_fields(self):
+        for index, status in enumerate(
+            (SamplingTask.Status.ASSIGNED, SamplingTask.Status.IN_PROGRESS), start=1
+        ):
+            with self.subTest(status=status):
+                task = self.make_task(number=f"EDIT-{index}", status=status)
+
+                response = self.client.post(
+                    reverse("management:task-edit", args=[task.pk]),
+                    {
+                        "task_number": task.task_number,
+                        "name": f"修改名称-{index}",
+                        "personnel_group": self.group.pk,
+                        "draw_count": task.draw_count,
+                        "notes": f"修改备注-{index}",
+                    },
+                )
+
+                self.assertRedirects(
+                    response, reverse("management:task-detail", args=[task.pk])
+                )
+                task.refresh_from_db()
+                self.assertEqual(task.name, f"修改名称-{index}")
+                self.assertEqual(task.notes, f"修改备注-{index}")
+
+    def test_executed_task_edit_still_rejects_protected_field_changes(self):
+        other_group = PersonnelGroup.objects.create(name="第二组", created_by=self.admin)
+        task = self.make_task(status=SamplingTask.Status.ASSIGNED)
+
+        response = self.client.post(
+            reverse("management:task-edit", args=[task.pk]),
+            {
+                "task_number": task.task_number,
+                "name": task.name,
+                "personnel_group": other_group.pk,
+                "draw_count": 2,
+                "notes": task.notes,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        task.refresh_from_db()
+        self.assertEqual(task.personnel_group, self.group)
+        self.assertEqual(task.draw_count, 1)
+        self.assertContains(response, "任务已执行，抽样组和抽取数量不可修改")
+
     def test_admin_adds_and_deletes_candidate_through_lifecycle(self):
         task = self.make_task()
         response = self.client.post(
@@ -215,3 +261,20 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, self.sampler.username)
         self.assertContains(response, "版本 1")
         self.assertContains(response, "draw.initial")
+
+    def test_detail_hides_reassignment_when_authorized_redraw_is_pending(self):
+        task = self.make_task(status=SamplingTask.Status.ASSIGNED)
+        SamplingBatch.objects.create(
+            task=task,
+            version=2,
+            kind=SamplingBatch.Kind.REDRAW,
+            status=SamplingBatch.Status.AUTHORIZED,
+            reason="样品损坏",
+            approved_by=self.admin,
+        )
+
+        response = self.client.get(reverse("management:task-detail", args=[task.pk]))
+
+        self.assertTrue(response.context["has_pending_redraw"])
+        self.assertFalse(response.context["can_reassign"])
+        self.assertNotContains(response, "重新分配原因")

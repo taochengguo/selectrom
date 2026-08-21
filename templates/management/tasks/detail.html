@@ -13,7 +13,7 @@
     {% if task.status == 'ready' %}
       <form method="post" action="{% url 'management:task-execute' task.pk %}">{% csrf_token %}<button type="submit">执行并随机分配</button></form>
     {% endif %}
-    {% if task.status == 'assigned' %}
+    {% if can_reassign %}
       <form method="post" action="{% url 'management:task-reassign' task.pk %}">
         {% csrf_token %}<label>重新分配原因 <input name="reason" required></label><button type="submit">重新分配</button>
       </form>

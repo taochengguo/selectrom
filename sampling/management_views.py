@@ -49,8 +49,18 @@ class AdminUserEditForm(forms.ModelForm):
             "is_active",
         )
 
+    def __init__(self, *args, acting_user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.acting_user = acting_user
+
     def clean_role(self):
         role = self.cleaned_data["role"]
+        if (
+            self.acting_user is not None
+            and self.instance.pk == self.acting_user.pk
+            and role != User.Role.ADMIN
+        ):
+            raise forms.ValidationError("当前登录账号必须保留管理员角色")
         if (
             role == User.Role.ADMIN
             and self.instance.pk
@@ -58,6 +68,16 @@ class AdminUserEditForm(forms.ModelForm):
         ):
             raise forms.ValidationError("请先将该用户移出所有抽样人员分组")
         return role
+
+    def clean_is_active(self):
+        is_active = self.cleaned_data["is_active"]
+        if (
+            self.acting_user is not None
+            and self.instance.pk == self.acting_user.pk
+            and not is_active
+        ):
+            raise forms.ValidationError("不能停用当前登录账号")
+        return is_active
 
 
 def _error_text(error):
@@ -132,8 +152,14 @@ def task_edit(request, pk):
     task = get_object_or_404(SamplingTask, pk=pk)
     form = SamplingTaskForm(request.POST or None, instance=task)
     if request.method == "POST" and form.is_valid():
+        changes = {
+            field: form.cleaned_data[field]
+            for field in form.changed_data
+            if field in form.cleaned_data
+        }
         try:
-            update_task(task_id=task.pk, actor=request.user, **form.cleaned_data)
+            if changes:
+                update_task(task_id=task.pk, actor=request.user, **changes)
         except (ValidationError, ValueError) as error:
             form.add_error(None, _error_text(error))
         else:
@@ -154,10 +180,22 @@ def task_detail(request, pk):
         ),
         pk=pk,
     )
+    has_pending_redraw = any(
+        batch.status == SamplingBatch.Status.AUTHORIZED
+        for batch in task.sampling_batches.all()
+    )
+    can_reassign = (
+        task.status == SamplingTask.Status.ASSIGNED and not has_pending_redraw
+    )
     return render(
         request,
         "management/tasks/detail.html",
-        {"task": task, "candidate_form": CandidateMaterialForm()},
+        {
+            "task": task,
+            "candidate_form": CandidateMaterialForm(),
+            "has_pending_redraw": has_pending_redraw,
+            "can_reassign": can_reassign,
+        },
     )
 
 
@@ -284,7 +322,9 @@ def user_create(request):
 @admin_required
 def user_edit(request, pk):
     user = get_object_or_404(User, pk=pk)
-    form = AdminUserEditForm(request.POST or None, instance=user)
+    form = AdminUserEditForm(
+        request.POST or None, instance=user, acting_user=request.user
+    )
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "用户信息已更新")

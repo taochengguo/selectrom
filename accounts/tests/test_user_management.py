@@ -78,6 +78,41 @@ class UserManagementTests(TestCase):
         self.admin.refresh_from_db()
         self.assertTrue(self.admin.is_active)
 
+    def test_admin_cannot_disable_current_account_through_edit_form(self):
+        response = self.client.post(
+            reverse("management:user-edit", args=[self.admin.pk]),
+            {
+                "username": self.admin.username,
+                "role": User.Role.ADMIN,
+                "first_name": "",
+                "last_name": "",
+                "phone": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+        self.assertContains(response, "不能停用当前登录账号")
+
+    def test_admin_cannot_demote_current_account_through_edit_form(self):
+        response = self.client.post(
+            reverse("management:user-edit", args=[self.admin.pk]),
+            {
+                "username": self.admin.username,
+                "role": User.Role.SAMPLER,
+                "first_name": "",
+                "last_name": "",
+                "phone": "",
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.admin.refresh_from_db()
+        self.assertEqual(self.admin.role, User.Role.ADMIN)
+        self.assertContains(response, "当前登录账号必须保留管理员角色")
+
     def test_grouped_sampler_cannot_be_changed_to_admin_role(self):
         group = PersonnelGroup.objects.create(name="抽样组", created_by=self.admin)
         group.members.add(self.sampler)
