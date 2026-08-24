@@ -1,8 +1,49 @@
+import re
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.test import SimpleTestCase
+
+
+def _custom_property(css, name):
+    match = re.search(rf"{re.escape(name)}\s*:\s*(#[0-9a-fA-F]{{6}})", css)
+    if match is None:
+        raise AssertionError(f"Missing CSS custom property: {name}")
+    return match.group(1)
+
+
+def _selector_color(css, selector, tokens):
+    block_match = re.search(
+        rf"{re.escape(selector)}\s*\{{(?P<body>.*?)\}}", css, re.DOTALL
+    )
+    if block_match is None:
+        raise AssertionError(f"Missing CSS selector: {selector}")
+    color_match = re.search(r"(?:^|\n)\s*color\s*:\s*([^;]+)", block_match.group("body"))
+    if color_match is None:
+        raise AssertionError(f"Missing color declaration for: {selector}")
+    value = color_match.group(1).strip()
+    variable_match = re.fullmatch(r"var\((--[-a-z0-9]+)\)", value)
+    return _custom_property(tokens, variable_match.group(1)) if variable_match else value
+
+
+def _relative_luminance(hex_color):
+    channels = [int(hex_color[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+    linear = [
+        channel / 12.92
+        if channel <= 0.04045
+        else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast_ratio(foreground, background):
+    lighter, darker = sorted(
+        (_relative_luminance(foreground), _relative_luminance(background)),
+        reverse=True,
+    )
+    return (lighter + 0.05) / (darker + 0.05)
 
 
 class TemplateContractTests(SimpleTestCase):
@@ -33,6 +74,27 @@ class TemplateContractTests(SimpleTestCase):
         ):
             with self.subTest(token=token):
                 self.assertIn(token, css)
+
+    def test_small_muted_text_and_inactive_navigation_meet_wcag_aa(self):
+        tokens = self.read_project_file("static/css/tokens.css")
+        mobile = self.read_project_file("static/css/mobile.css")
+        muted = _custom_property(tokens, "--color-text-muted")
+        card = _custom_property(tokens, "--color-surface-card")
+        page = _custom_property(tokens, "--color-surface-page")
+        inactive_nav = _selector_color(mobile, ".mobile-tab", tokens)
+
+        combinations = (
+            ("muted text on cards", muted, card),
+            ("muted text on page background", muted, page),
+            ("inactive mobile navigation on white", inactive_nav, card),
+        )
+        for label, foreground, background in combinations:
+            with self.subTest(label=label):
+                self.assertGreaterEqual(
+                    _contrast_ratio(foreground, background),
+                    4.5,
+                    f"{label} must meet WCAG AA for normal text",
+                )
 
     def test_mobile_shell_loads_shared_styles_and_has_three_required_tabs(self):
         html = self.read_project_file("templates/mobile/base.html")

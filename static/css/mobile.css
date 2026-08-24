@@ -433,7 +433,7 @@ body {
   min-height: 54px;
   padding: var(--space-2) var(--space-1);
   border-radius: var(--radius-sm);
-  color: #7c879a;
+  color: var(--color-text-muted);
   font-size: 14px;
   font-weight: 700;
   text-align: center;
