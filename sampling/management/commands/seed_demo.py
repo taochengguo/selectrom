@@ -54,16 +54,16 @@ class Command(BaseCommand):
             sampler.save(update_fields=["password"])
             samplers.append(sampler)
 
-        group, _ = PersonnelGroup.objects.update_or_create(
+        group, _ = PersonnelGroup.objects.get_or_create(
             name="演示抽样组",
             defaults={
                 "description": "仅用于本机演示的抽样人员分组",
                 "created_by": admin,
             },
         )
-        group.members.set(samplers)
+        group.members.add(*samplers)
 
-        SamplingTask.objects.update_or_create(
+        SamplingTask.objects.get_or_create(
             task_number="DEMO-DRAFT-001",
             defaults={
                 "name": "演示草稿抽样任务",
@@ -74,7 +74,7 @@ class Command(BaseCommand):
                 "created_by": admin,
             },
         )
-        ready_task, _ = SamplingTask.objects.update_or_create(
+        ready_task, created = SamplingTask.objects.get_or_create(
             task_number="DEMO-READY-001",
             defaults={
                 "name": "演示待执行抽样任务",
@@ -85,17 +85,16 @@ class Command(BaseCommand):
                 "created_by": admin,
             },
         )
-        for material_number, order_number, supplier, material_name, quantity in DEMO_MATERIALS:
-            CandidateMaterial.objects.update_or_create(
-                task=ready_task,
-                material_number=material_number,
-                defaults={
-                    "order_number": order_number,
-                    "supplier": supplier,
-                    "material_name": material_name,
-                    "quantity": quantity,
-                },
-            )
+        if created:
+            for material_number, order_number, supplier, material_name, quantity in DEMO_MATERIALS:
+                CandidateMaterial.objects.create(
+                    task=ready_task,
+                    material_number=material_number,
+                    order_number=order_number,
+                    supplier=supplier,
+                    material_name=material_name,
+                    quantity=quantity,
+                )
 
         self.stdout.write(self.style.SUCCESS("本机演示数据已准备完成。"))
         self.stdout.write("管理员：demo_admin")

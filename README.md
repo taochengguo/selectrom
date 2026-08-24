@@ -46,7 +46,7 @@
 
     .\scripts\start.ps1
 
-首次演示或需要恢复演示数据时：
+首次演示或需要创建尚不存在的演示数据时：
 
     .\scripts\start.ps1 -SeedDemo
 
