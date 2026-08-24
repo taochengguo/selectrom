@@ -49,8 +49,8 @@ body {
 
 .mobile-main {
   display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-4) calc(92px + env(safe-area-inset-bottom));
+  gap: var(--space-3);
+  padding: 0 var(--space-4) calc(92px + env(safe-area-inset-bottom));
 }
 
 .mobile-main > section,
@@ -67,17 +67,17 @@ body {
   padding: var(--space-5);
 }
 
-.mobile-hero {
+.mobile-main > .mobile-hero {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 164px;
-  padding: var(--space-6) var(--space-5);
+  min-height: 108px;
+  padding: var(--space-4) var(--space-5);
   border: 0;
   border-radius: var(--radius-md);
   background-color: #cfe4ff;
   background-image: url("../img/sampling-hero.png");
-  background-position: center right;
+  background-position: 36px center;
   background-repeat: no-repeat;
   background-size: cover;
   box-shadow: none;
@@ -91,9 +91,9 @@ body {
 }
 
 .mobile-hero h2 {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
   color: var(--color-text-strong);
-  font-size: clamp(24px, 7vw, 32px);
+  font-size: clamp(22px, 6.2vw, 28px);
   font-weight: 900;
   line-height: 1.15;
   letter-spacing: 0.02em;
@@ -102,9 +102,38 @@ body {
 .mobile-hero p {
   margin: 0;
   color: #1a51a8;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 1.5;
+}
+
+.mobile-main > .mobile-hero + .mobile-card {
+  padding: var(--space-3);
+}
+
+.mobile-main > .mobile-hero + .mobile-card .section-heading {
+  margin-bottom: var(--space-2);
+}
+
+.mobile-main > .mobile-hero + .mobile-card .summary-grid {
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.mobile-main > .mobile-hero + .mobile-card .summary-item {
+  padding: var(--space-2) var(--space-1);
+}
+
+.mobile-main > .mobile-hero + .mobile-card .summary-item dt {
+  font-size: 11px;
+}
+
+.mobile-main > .mobile-hero + .mobile-card .summary-item dd {
+  font-size: 22px;
+}
+
+.mobile-main > .mobile-hero + .mobile-card .primary-action {
+  min-height: 48px;
 }
 
 .section-heading,
@@ -450,17 +479,17 @@ body {
   gap: var(--space-3);
 }
 
-@media (min-width: 410px) {
+@media (min-width: 360px) {
   .summary-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .summary-item {
-    padding: var(--space-3) var(--space-2);
+    padding: var(--space-2) var(--space-1);
   }
 
   .summary-item dd {
-    font-size: 24px;
+    font-size: 22px;
   }
 }
 
@@ -470,9 +499,9 @@ body {
     padding-left: var(--space-3);
   }
 
-  .mobile-hero {
-    min-height: 150px;
-    padding: var(--space-5) var(--space-4);
+  .mobile-main > .mobile-hero {
+    min-height: 100px;
+    padding: var(--space-4);
   }
 
   .mobile-hero__copy {
