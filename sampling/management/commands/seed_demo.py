@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db import transaction
 
 from accounts.models import User
 from personnel.models import PersonnelGroup
@@ -63,38 +64,39 @@ class Command(BaseCommand):
         )
         group.members.add(*samplers)
 
-        SamplingTask.objects.get_or_create(
-            task_number="DEMO-DRAFT-001",
-            defaults={
-                "name": "演示草稿抽样任务",
-                "personnel_group": group,
-                "draw_count": 3,
-                "status": SamplingTask.Status.DRAFT,
-                "notes": "可在后台继续编辑或导入候选物资。",
-                "created_by": admin,
-            },
-        )
-        ready_task, created = SamplingTask.objects.get_or_create(
-            task_number="DEMO-READY-001",
-            defaults={
-                "name": "演示待执行抽样任务",
-                "personnel_group": group,
-                "draw_count": 3,
-                "status": SamplingTask.Status.READY,
-                "notes": "可在后台执行，系统会随机分配一名抽样人员。",
-                "created_by": admin,
-            },
-        )
-        if created:
-            for material_number, order_number, supplier, material_name, quantity in DEMO_MATERIALS:
-                CandidateMaterial.objects.create(
-                    task=ready_task,
-                    material_number=material_number,
-                    order_number=order_number,
-                    supplier=supplier,
-                    material_name=material_name,
-                    quantity=quantity,
-                )
+        with transaction.atomic():
+            SamplingTask.objects.get_or_create(
+                task_number="DEMO-DRAFT-001",
+                defaults={
+                    "name": "演示草稿抽样任务",
+                    "personnel_group": group,
+                    "draw_count": 3,
+                    "status": SamplingTask.Status.DRAFT,
+                    "notes": "可在后台继续编辑或导入候选物资。",
+                    "created_by": admin,
+                },
+            )
+            ready_task, created = SamplingTask.objects.get_or_create(
+                task_number="DEMO-READY-001",
+                defaults={
+                    "name": "演示待执行抽样任务",
+                    "personnel_group": group,
+                    "draw_count": 3,
+                    "status": SamplingTask.Status.READY,
+                    "notes": "可在后台执行，系统会随机分配一名抽样人员。",
+                    "created_by": admin,
+                },
+            )
+            if created:
+                for material_number, order_number, supplier, material_name, quantity in DEMO_MATERIALS:
+                    CandidateMaterial.objects.create(
+                        task=ready_task,
+                        material_number=material_number,
+                        order_number=order_number,
+                        supplier=supplier,
+                        material_name=material_name,
+                        quantity=quantity,
+                    )
 
         self.stdout.write(self.style.SUCCESS("本机演示数据已准备完成。"))
         self.stdout.write("管理员：demo_admin")
