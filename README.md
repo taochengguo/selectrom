@@ -27,6 +27,8 @@
 
     Copy-Item .env.example .env
 
+`.env.example` 中的 `DJANGO_SECRET_KEY` 只适用于本机演示。任何非本机演示环境都必须替换为独立的强随机密钥；当 `DJANGO_DEBUG=false` 时，未配置 `DJANGO_SECRET_KEY` 会直接导致启动失败。
+
 ### 4. 迁移与演示数据
 
     .\.venv\Scripts\python.exe manage.py migrate

@@ -40,6 +40,8 @@ class SamplingTask(models.Model):
         ]
 
     def mark_ready(self):
+        if self.status != self.Status.DRAFT:
+            raise ValueError("只有草稿任务可以设为待执行")
         candidate_count = self.candidates.count()
         if self.draw_count <= 0:
             raise ValueError("抽取数量必须大于零")

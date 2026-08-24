@@ -1,11 +1,17 @@
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from accounts.models import User
 from audit.models import TaskAuditLog
 from personnel.models import PersonnelGroup
-from sampling.models import CandidateMaterial, PersonnelAssignment, SamplingBatch, SamplingTask
+from sampling.models import (
+    CandidateMaterial,
+    PersonnelAssignment,
+    SamplingBatch,
+    SamplingResult,
+    SamplingTask,
+)
 from sampling.services.drawing import draw_materials
 
 
@@ -148,6 +154,123 @@ class ManagementViewTests(TestCase):
         self.assertFalse(CandidateMaterial.objects.filter(pk=candidate.pk).exists())
         self.assertTrue(TaskAuditLog.objects.filter(task=task, event_type="material.deleted").exists())
 
+    def test_admin_edits_candidate_through_audited_lifecycle_service(self):
+        task = self.make_task()
+        candidate = self.add_candidate(task)
+
+        detail = self.client.get(reverse("management:task-detail", args=[task.pk]))
+        response = self.client.post(
+            reverse("management:task-candidate-edit", args=[candidate.pk]),
+            {
+                "material_number": "M-EDITED",
+                "order_number": "O-EDITED",
+                "supplier": "new supplier",
+                "material_name": "new material",
+                "quantity": 25,
+            },
+        )
+
+        self.assertContains(
+            detail,
+            reverse("management:task-candidate-edit", args=[candidate.pk]),
+        )
+        self.assertRedirects(response, reverse("management:task-detail", args=[task.pk]))
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.material_number, "M-EDITED")
+        self.assertEqual(candidate.quantity, 25)
+        audit = TaskAuditLog.objects.get(task=task, event_type="material.updated")
+        self.assertEqual(audit.before_data["material_number"], "M-1")
+        self.assertEqual(audit.after_data["material_number"], "M-EDITED")
+
+    def test_candidate_edit_keeps_submitted_values_and_errors_when_validation_fails(self):
+        task = self.make_task()
+        candidate = self.add_candidate(task)
+
+        response = self.client.post(
+            reverse("management:task-candidate-edit", args=[candidate.pk]),
+            {
+                "material_number": "M-EDITED",
+                "order_number": "O-EDITED",
+                "supplier": "new supplier",
+                "material_name": "new material",
+                "quantity": 0,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors)
+        self.assertContains(response, 'value="M-EDITED"')
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.material_number, "M-1")
+        self.assertEqual(candidate.quantity, 10)
+        self.assertFalse(TaskAuditLog.objects.filter(event_type="material.updated").exists())
+
+    def test_candidate_edit_reports_executed_task_freeze_without_changing_candidate(self):
+        task = self.make_task(status=SamplingTask.Status.ASSIGNED)
+        candidate = self.add_candidate(task)
+
+        response = self.client.post(
+            reverse("management:task-candidate-edit", args=[candidate.pk]),
+            {
+                "material_number": candidate.material_number,
+                "order_number": candidate.order_number,
+                "supplier": candidate.supplier,
+                "material_name": "must not persist",
+                "quantity": candidate.quantity,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "\u4efb\u52a1\u5df2\u6267\u884c\uff0c\u5019\u9009\u7269\u8d44\u4e0d\u53ef\u4fee\u6539",
+        )
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.material_name, "\u7269\u8d44")
+        self.assertFalse(TaskAuditLog.objects.filter(event_type="material.updated").exists())
+
+    def test_candidate_edit_is_administrator_only(self):
+        task = self.make_task()
+        candidate = self.add_candidate(task)
+        self.client.force_login(self.sampler)
+        url = reverse("management:task-candidate-edit", args=[candidate.pk])
+
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(
+            self.client.post(
+                url,
+                {
+                    "material_number": "M-EDITED",
+                    "order_number": "O-EDITED",
+                    "supplier": "new supplier",
+                    "material_name": "new material",
+                    "quantity": 25,
+                },
+            ).status_code,
+            403,
+        )
+
+    def test_candidate_edit_post_requires_csrf(self):
+        task = self.make_task()
+        candidate = self.add_candidate(task)
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.admin)
+
+        response = csrf_client.post(
+            reverse("management:task-candidate-edit", args=[candidate.pk]),
+            {
+                "material_number": "M-EDITED",
+                "order_number": "O-EDITED",
+                "supplier": "new supplier",
+                "material_name": "new material",
+                "quantity": 25,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.material_number, "M-1")
+
     def test_admin_imports_csv_and_marks_task_ready(self):
         task = self.make_task()
         csv_file = SimpleUploadedFile(
@@ -278,3 +401,39 @@ class ManagementViewTests(TestCase):
         self.assertTrue(response.context["has_pending_redraw"])
         self.assertFalse(response.context["can_reassign"])
         self.assertNotContains(response, "重新分配原因")
+
+    def test_detail_orders_batches_by_version_and_results_by_sequence(self):
+        task = self.make_task(status=SamplingTask.Status.IN_PROGRESS)
+        SamplingBatch.objects.create(
+            task=task,
+            version=2,
+            kind=SamplingBatch.Kind.REDRAW,
+            status=SamplingBatch.Status.AUTHORIZED,
+        )
+        version_one = SamplingBatch.objects.create(
+            task=task,
+            version=1,
+            kind=SamplingBatch.Kind.INITIAL,
+            status=SamplingBatch.Status.LOCKED,
+        )
+        second_result = self.add_candidate(task, "RESULT-SECOND")
+        first_result = self.add_candidate(task, "RESULT-FIRST")
+        SamplingResult.objects.create(
+            batch=version_one, material=second_result, sequence=2
+        )
+        SamplingResult.objects.create(
+            batch=version_one, material=first_result, sequence=1
+        )
+
+        response = self.client.get(reverse("management:task-detail", args=[task.pk]))
+
+        batch_markup = response.content.decode().split(
+            "\u62bd\u6837\u6279\u6b21\u4e0e\u7ed3\u679c", 1
+        )[1]
+        self.assertLess(
+            batch_markup.index("\u7248\u672c 1"),
+            batch_markup.index("\u7248\u672c 2"),
+        )
+        self.assertLess(
+            batch_markup.index("RESULT-FIRST"), batch_markup.index("RESULT-SECOND")
+        )

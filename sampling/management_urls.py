@@ -13,6 +13,7 @@ urlpatterns = [
     path("tasks/<int:pk>/edit/", views.task_edit, name="task-edit"),
     path("tasks/<int:pk>/import/", views.task_import, name="task-import"),
     path("tasks/<int:pk>/candidates/add/", views.task_candidate_add, name="task-candidate-add"),
+    path("candidates/<int:pk>/edit/", views.task_candidate_edit, name="task-candidate-edit"),
     path("candidates/<int:pk>/delete/", views.task_candidate_delete, name="task-candidate-delete"),
     path("tasks/<int:pk>/ready/", views.task_ready, name="task-ready"),
     path("tasks/<int:pk>/execute/", views.task_execute, name="task-execute"),

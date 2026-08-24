@@ -30,41 +30,41 @@ class Command(BaseCommand):
     help = "创建或更新本机随机抽样演示数据。"
 
     def handle(self, *args, **options):
-        admin, _ = User.objects.update_or_create(
-            username="demo_admin",
-            defaults={
-                "role": User.Role.ADMIN,
-                "first_name": "演示管理员",
-                "is_active": True,
-            },
-        )
-        admin.set_password(DEMO_PASSWORD)
-        admin.save(update_fields=["password"])
-
-        samplers = []
-        for username, first_name in DEMO_SAMPLERS:
-            sampler, _ = User.objects.update_or_create(
-                username=username,
+        with transaction.atomic():
+            admin, _ = User.objects.update_or_create(
+                username="demo_admin",
                 defaults={
-                    "role": User.Role.SAMPLER,
-                    "first_name": first_name,
+                    "role": User.Role.ADMIN,
+                    "first_name": "演示管理员",
                     "is_active": True,
                 },
             )
-            sampler.set_password(DEMO_PASSWORD)
-            sampler.save(update_fields=["password"])
-            samplers.append(sampler)
+            admin.set_password(DEMO_PASSWORD)
+            admin.save(update_fields=["password"])
 
-        group, _ = PersonnelGroup.objects.get_or_create(
-            name="演示抽样组",
-            defaults={
-                "description": "仅用于本机演示的抽样人员分组",
-                "created_by": admin,
-            },
-        )
-        group.members.add(*samplers)
+            samplers = []
+            for username, first_name in DEMO_SAMPLERS:
+                sampler, _ = User.objects.update_or_create(
+                    username=username,
+                    defaults={
+                        "role": User.Role.SAMPLER,
+                        "first_name": first_name,
+                        "is_active": True,
+                    },
+                )
+                sampler.set_password(DEMO_PASSWORD)
+                sampler.save(update_fields=["password"])
+                samplers.append(sampler)
 
-        with transaction.atomic():
+            group, _ = PersonnelGroup.objects.get_or_create(
+                name="演示抽样组",
+                defaults={
+                    "description": "仅用于本机演示的抽样人员分组",
+                    "created_by": admin,
+                },
+            )
+            group.members.add(*samplers)
+
             SamplingTask.objects.get_or_create(
                 task_number="DEMO-DRAFT-001",
                 defaults={

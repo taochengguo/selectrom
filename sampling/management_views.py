@@ -2,14 +2,19 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
 from django.core.exceptions import ValidationError
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_required
 from accounts.models import User
 from sampling.forms import CandidateMaterialForm, SamplingTaskForm
-from sampling.models import CandidateMaterial, SamplingBatch, SamplingTask
+from sampling.models import (
+    CandidateMaterial,
+    SamplingBatch,
+    SamplingResult,
+    SamplingTask,
+)
 from sampling.services.assignment import assign_sampler, reassign_sampler
 from sampling.services.drawing import authorize_redraw
 from sampling.services.imports import CandidateImportError, import_candidates
@@ -20,6 +25,7 @@ from sampling.services.lifecycle import (
     create_task,
     delete_candidate,
     mark_task_ready,
+    update_candidate,
     update_task,
 )
 
@@ -175,7 +181,17 @@ def task_detail(request, pk):
             "candidates",
             "personnel_assignments__selected_user",
             "personnel_assignments__created_by",
-            "sampling_batches__results__material",
+            Prefetch(
+                "sampling_batches",
+                queryset=SamplingBatch.objects.order_by("version").prefetch_related(
+                    Prefetch(
+                        "results",
+                        queryset=SamplingResult.objects.select_related("material").order_by(
+                            "sequence"
+                        ),
+                    )
+                ),
+            ),
             "audit_logs__actor",
         ),
         pk=pk,
@@ -234,6 +250,33 @@ def task_candidate_add(request, pk):
     else:
         messages.error(request, _error_text(ValidationError(form.errors.as_json())))
     return redirect("management:task-detail", pk=task.pk)
+
+
+@admin_required
+def task_candidate_edit(request, pk):
+    candidate = get_object_or_404(CandidateMaterial, pk=pk)
+    form = CandidateMaterialForm(request.POST or None, instance=candidate)
+    if request.method == "POST" and form.is_valid():
+        changes = {
+            field: form.cleaned_data[field]
+            for field in form.changed_data
+            if field in form.cleaned_data
+        }
+        try:
+            if changes:
+                update_candidate(
+                    candidate_id=candidate.pk, actor=request.user, **changes
+                )
+        except (ValidationError, ValueError) as error:
+            form.add_error(None, _error_text(error))
+        else:
+            messages.success(request, "候选物资已更新")
+            return redirect("management:task-detail", pk=candidate.task_id)
+    return render(
+        request,
+        "management/tasks/candidate_form.html",
+        {"form": form, "candidate": candidate, "task": candidate.task},
+    )
 
 
 @admin_required

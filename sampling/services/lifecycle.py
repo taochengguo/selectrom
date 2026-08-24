@@ -9,6 +9,13 @@ class TaskFrozenError(ValueError):
 
 
 _MUTABLE_TASK_STATUSES = {SamplingTask.Status.DRAFT, SamplingTask.Status.READY}
+_CANCELLABLE_TASK_STATUSES = {
+    SamplingTask.Status.DRAFT,
+    SamplingTask.Status.READY,
+    SamplingTask.Status.ASSIGNED,
+    SamplingTask.Status.IN_PROGRESS,
+    SamplingTask.Status.COMPLETED,
+}
 _TASK_FIELDS = {
     "task_number",
     "name",
@@ -137,6 +144,10 @@ def mark_task_ready(*, task_id, actor):
 def cancel_task(*, task_id, actor):
     with transaction.atomic():
         task = _lock_task(task_id)
+        if task.status == SamplingTask.Status.CANCELLED:
+            return task
+        if task.status not in _CANCELLABLE_TASK_STATUSES:
+            raise ValueError("任务当前状态不可取消")
         before = _task_data(task)
         task.status = SamplingTask.Status.CANCELLED
         task.full_clean()

@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.http import JsonResponse
 from django.urls import include, path
 
@@ -17,3 +19,7 @@ urlpatterns = [
     path("manage/", include("sampling.management_urls")),
     path("manage/", include("personnel.urls")),
 ]
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

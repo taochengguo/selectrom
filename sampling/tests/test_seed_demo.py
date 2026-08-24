@@ -1,3 +1,4 @@
+from io import StringIO
 from unittest.mock import patch
 
 from django.core.management import call_command
@@ -186,6 +187,70 @@ class SeedDemoTests(TestCase):
         ready_task = SamplingTask.objects.get(task_number="DEMO-READY-001")
         self.assertEqual(ready_task.candidates.count(), 10)
 
+    def test_seed_demo_failure_restores_the_exact_pre_call_database_snapshot(self):
+        admin = User.objects.create_user(
+            "demo_admin",
+            role=User.Role.SAMPLER,
+            first_name="original admin name",
+            is_active=False,
+            password="original-admin-password",
+        )
+        sampler = User.objects.create_user(
+            "demo_sampler_01",
+            role=User.Role.SAMPLER,
+            first_name="original sampler name",
+            is_active=False,
+            password="original-sampler-password",
+        )
+        extra_sampler = User.objects.create_user(
+            "existing_sampler",
+            role=User.Role.SAMPLER,
+            password="existing-password",
+        )
+        group = PersonnelGroup.objects.create(
+            name="\u6f14\u793a\u62bd\u6837\u7ec4",
+            description="original group description",
+            created_by=admin,
+        )
+        group.members.add(sampler, extra_sampler)
+        historical_task = SamplingTask.objects.create(
+            task_number="HISTORICAL-001",
+            name="historical task",
+            personnel_group=group,
+            draw_count=1,
+            status=SamplingTask.Status.COMPLETED,
+            created_by=admin,
+        )
+        CandidateMaterial.objects.create(
+            task=historical_task,
+            material_number="HIST-M-001",
+            order_number="HIST-O-001",
+            supplier="historical supplier",
+            material_name="historical material",
+            quantity=7,
+        )
+        before = self._seed_write_snapshot()
+        output = StringIO()
+        real_create = CandidateMaterial.objects.create
+        attempts = 0
+
+        def fail_on_second_demo_candidate(*args, **kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 2:
+                raise RuntimeError("simulated candidate failure")
+            return real_create(*args, **kwargs)
+
+        with patch(
+            "sampling.management.commands.seed_demo.CandidateMaterial.objects.create",
+            side_effect=fail_on_second_demo_candidate,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "simulated candidate failure"):
+                call_command("seed_demo", stdout=output)
+
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(self._seed_write_snapshot(), before)
+
     def test_seed_demo_preserves_existing_partial_task_without_repairing_it(self):
         custom_admin = User.objects.create_user("partial_admin", role=User.Role.ADMIN)
         custom_sampler = User.objects.create_user("partial_sampler", role=User.Role.SAMPLER)
@@ -240,3 +305,52 @@ class SeedDemoTests(TestCase):
         self.assertTrue(sampler.is_active)
         self.assertEqual(sampler.first_name, "\u6f14\u793a\u62bd\u6837\u5458\u4e00")
         self.assertTrue(sampler.check_password("demo123456"))
+
+    @staticmethod
+    def _seed_write_snapshot():
+        return {
+            "users": list(
+                User.objects.order_by("username").values(
+                    "id",
+                    "username",
+                    "password",
+                    "role",
+                    "first_name",
+                    "last_name",
+                    "is_active",
+                )
+            ),
+            "groups": list(
+                PersonnelGroup.objects.order_by("id").values(
+                    "id", "name", "description", "created_by_id"
+                )
+            ),
+            "memberships": list(
+                PersonnelGroup.members.through.objects.order_by(
+                    "personnelgroup_id", "user_id"
+                ).values("personnelgroup_id", "user_id")
+            ),
+            "tasks": list(
+                SamplingTask.objects.order_by("id").values(
+                    "id",
+                    "task_number",
+                    "name",
+                    "personnel_group_id",
+                    "draw_count",
+                    "status",
+                    "notes",
+                    "created_by_id",
+                )
+            ),
+            "candidates": list(
+                CandidateMaterial.objects.order_by("id").values(
+                    "id",
+                    "task_id",
+                    "material_number",
+                    "order_number",
+                    "supplier",
+                    "material_name",
+                    "quantity",
+                )
+            ),
+        }
