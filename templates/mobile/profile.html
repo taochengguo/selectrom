@@ -4,29 +4,75 @@
 {% block page_title %}个人中心{% endblock %}
 
 {% block content %}
-  <section class="mobile-card">
-    <div class="section-heading"><h2>个人信息</h2></div>
-    <p class="profile-account">账号：{{ request.user.username }}</p>
-    <form class="mobile-form" method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="update_profile">
-      {{ form.as_p }}
-      <button type="submit">保存</button>
-    </form>
+  <section class="mobile-card profile-identity" aria-label="个人资料">
+    <div class="profile-avatar"><img src="{{ avatar_url }}" alt="当前头像"></div>
+    <div class="profile-identity__text"><h2>{{ request.user.first_name|default:request.user.username }}</h2><p>账号：{{ request.user.username }}</p><span>高效抽样，规范执行</span></div>
+    <button class="profile-identity__edit" type="button" data-open-dialog="profile-dialog" aria-label="编辑个人资料"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
   </section>
-  <section class="mobile-card">
-    <div class="section-heading"><h2>修改密码</h2></div>
+
+  <section class="mobile-feature mobile-feature--profile" aria-labelledby="profile-heading">
+    <div class="mobile-feature__copy"><h2 id="profile-heading">我的抽样</h2><p>累计参与 <strong>{{ summary.total }}</strong> 项抽样任务</p><a class="mobile-feature__action mobile-feature__action--outline" href="{% url 'mobile:reminders' %}">查看记录 <i class="bi bi-chevron-right" aria-hidden="true"></i></a></div>
+  </section>
+
+  <section class="mobile-card mobile-card--metrics" aria-label="个人任务概览">
+    <dl class="mobile-metrics">
+      <div><span class="metric-icon metric-icon--green"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span><dt>已完成</dt><dd>{{ summary.completed }}</dd></div>
+      <div><span class="metric-icon metric-icon--orange"><i class="bi bi-clock-fill" aria-hidden="true"></i></span><dt>待执行</dt><dd>{{ summary.assigned }}</dd></div>
+      <div><span class="metric-icon metric-icon--blue"><i class="bi bi-file-earmark-text-fill" aria-hidden="true"></i></span><dt>总任务</dt><dd>{{ summary.total }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="mobile-card profile-menu" aria-label="我的功能">
+    <a href="{% url 'mobile:reminders' %}"><i class="bi bi-clipboard-check-fill" aria-hidden="true"></i>我的任务<i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+    <a href="{% url 'mobile:reminders' %}?status=completed"><i class="bi bi-file-earmark-text-fill" aria-hidden="true"></i>抽样记录<i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+    <a href="{% url 'mobile:reminders' %}?status=assigned"><i class="bi bi-bell-fill" aria-hidden="true"></i>任务提醒<i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+  </section>
+
+  <section class="mobile-card profile-menu" aria-label="账号功能">
+    <button type="button" data-open-dialog="profile-dialog"><i class="bi bi-person-gear" aria-hidden="true"></i>个人设置<i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+    <button type="button" data-open-dialog="password-dialog"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i>修改密码<i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+  </section>
+
+  <dialog id="profile-dialog" class="profile-dialog" aria-labelledby="profile-dialog-title"{% if form.errors %} data-initial-open{% endif %}>
+    <div class="profile-dialog__header"><h2 id="profile-dialog-title">个人设置</h2><button type="button" class="profile-dialog__close" data-close-dialog aria-label="关闭个人设置"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
     <form class="mobile-form" method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="change_password">
-      {{ password_form.as_p }}
-      <button type="submit">更新密码</button>
+      {% csrf_token %}<input type="hidden" name="action" value="update_profile">
+      <div class="profile-field"><label for="{{ form.first_name.id_for_label }}">昵称</label>{{ form.first_name }}{{ form.first_name.errors }}</div>
+      <fieldset class="avatar-picker"><legend>选择头像</legend><div class="avatar-picker__options">
+        {% for option in avatar_options %}
+          <label class="avatar-picker__option"><input type="radio" name="avatar_choice" value="{{ option.value }}"{% if form.avatar_choice.value == option.value %} checked{% endif %}><img src="{{ option.url }}" alt=""><span>{{ option.label }}</span></label>
+        {% endfor %}
+      </div>{{ form.avatar_choice.errors }}</fieldset>
+      <button type="submit">保存资料</button>
     </form>
-  </section>
-  <section class="mobile-card">
-    <form class="mobile-form" method="post" action="{% url 'accounts:logout' %}">
-      {% csrf_token %}
-      <button type="submit">退出登录</button>
+  </dialog>
+  <dialog id="password-dialog" class="profile-dialog" aria-labelledby="password-dialog-title"{% if password_form.errors %} data-initial-open{% endif %}>
+    <div class="profile-dialog__header"><h2 id="password-dialog-title">修改密码</h2><button type="button" class="profile-dialog__close" data-close-dialog aria-label="关闭修改密码"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
+    <form class="mobile-form" method="post">
+      {% csrf_token %}<input type="hidden" name="action" value="change_password">
+      {{ password_form.as_p }}<button type="submit">更新密码</button>
     </form>
-  </section>
+  </dialog>
+  <form class="profile-logout" method="post" action="{% url 'accounts:logout' %}">
+    {% csrf_token %}<button type="submit">退出登录</button>
+  </form>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const profileDialogs = document.querySelectorAll('.profile-dialog');
+    function openProfileDialog(dialog) {
+      if (!dialog.open) dialog.showModal();
+      document.body.classList.add('profile-dialog-open');
+    }
+    document.querySelectorAll('[data-open-dialog]').forEach(button => {
+      button.addEventListener('click', () => openProfileDialog(document.getElementById(button.dataset.openDialog)));
+    });
+    profileDialogs.forEach(dialog => {
+      dialog.querySelector('[data-close-dialog]').addEventListener('click', () => dialog.close());
+      dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+      dialog.addEventListener('close', () => document.body.classList.remove('profile-dialog-open'));
+      if (dialog.hasAttribute('data-initial-open')) openProfileDialog(dialog);
+    });
+  </script>
 {% endblock %}

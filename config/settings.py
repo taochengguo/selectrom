@@ -20,7 +20,13 @@ if not SECRET_KEY:
         raise ImproperlyConfigured(
             "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false"
         )
-ALLOWED_HOSTS = [host for host in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if host]
+# The Windows launcher supplies current LAN addresses without rewriting .env.
+ALLOWED_HOSTS = list(dict.fromkeys(
+    host.strip()
+    for value in (os.getenv("DJANGO_ALLOWED_HOSTS", ""), os.getenv("DJANGO_LAN_HOSTS", ""))
+    for host in value.replace("，", ",").split(",")
+    if host.strip()
+))
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -80,7 +86,7 @@ DATABASES = {
     }
 }
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "zh-hans"
 TIME_ZONE = "Asia/Shanghai"
 USE_I18N = True
 USE_TZ = True

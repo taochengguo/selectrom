@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}随机抽样{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}">
 </head>
 <body class="mobile-body">
@@ -23,9 +24,9 @@
     </main>
     {% with url_name=request.resolver_match.url_name %}
       <nav class="mobile-bottom-nav" aria-label="手机端主导航">
-        <a class="mobile-tab{% if url_name == 'dashboard' %} is-active{% endif %}" href="{% url 'mobile:dashboard' %}"{% if url_name == 'dashboard' %} aria-current="page"{% endif %}>随机抽样</a>
-        <a class="mobile-tab{% if url_name == 'reminders' or url_name == 'task-detail' %} is-active{% endif %}" href="{% url 'mobile:reminders' %}"{% if url_name == 'reminders' or url_name == 'task-detail' %} aria-current="page"{% endif %}>任务提醒</a>
-        <a class="mobile-tab{% if url_name == 'profile' %} is-active{% endif %}" href="{% url 'mobile:profile' %}"{% if url_name == 'profile' %} aria-current="page"{% endif %}>个人中心</a>
+        <a class="mobile-tab{% if request.path == '/m/' %} is-active{% endif %}" href="{% url 'mobile:dashboard' %}"{% if request.path == '/m/' %} aria-current="page"{% endif %}><i class="bi bi-house-fill" aria-hidden="true"></i><span>随机抽样</span></a>
+        <a class="mobile-tab{% if url_name == 'reminders' or url_name == 'task-detail' %} is-active{% endif %}" href="{% url 'mobile:reminders' %}"{% if url_name == 'reminders' or url_name == 'task-detail' %} aria-current="page"{% endif %}><i class="bi bi-bell-fill" aria-hidden="true"></i><span>任务提醒</span></a>
+        <a class="mobile-tab{% if url_name == 'profile' %} is-active{% endif %}" href="{% url 'mobile:profile' %}"{% if url_name == 'profile' %} aria-current="page"{% endif %}><i class="bi bi-person-fill" aria-hidden="true"></i><span>个人中心</span></a>
       </nav>
     {% endwith %}
   </div>

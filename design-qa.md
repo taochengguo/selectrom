@@ -64,3 +64,25 @@ The focused comparison covers the hero, daily-task summary, and primary action a
 - [x] Console and page errors checked.
 
 final result: passed
+
+## 2026-09-28：三张移动端参考图优化
+
+**对照证据**：`static/img/随机抽样.png`、`static/img/任务提醒.png`、`static/img/个人中心.png` 与 `docs/verification/mobile-*-comparison-2026-09-28.png` 并排比较。实测视口为 390×844，并补充 320×700 窄屏检查；登录为抽样人员演示账号。
+
+**检查结果**：
+
+- 字体与层级：标题、卡片标题、统计数字、次要信息和状态标签层级清晰；三页均无文字截断影响操作。
+- 布局与间距：搜索、状态标签、插画横幅、统计栏、快捷入口、任务卡片、资料卡与底部导航按照参考图的顺序呈现；三页无横向溢出。
+- 配色与状态：蓝白背景、白色圆角卡片、蓝色当前状态、橙色待执行和绿色已完成与参考图一致。
+- 图片与图标：横幅使用项目已有的高清抽样插画；图标使用本地 Bootstrap Icons 字体，浏览器检查已成功加载。参考图中的示例数字、虚拟任务、手机系统状态栏不属于真实 H5 页面内容；当前页面呈现数据库中的实际账号与任务。
+- 交互：搜索、状态筛选、卡片跳转、资料弹窗、三栏导航可用；浏览器无页面错误或 4xx 资源错误。
+
+首次截图发现横幅插画未显示、左侧插画与文字重叠、首页导航未高亮。修正样式与重启预览后重新截图对照；以上问题已解决。参考图中的通知开关和模板入口没有对应后端能力，仍按已确认的范围保留真实可用入口。
+
+final result: passed
+
+## 2026-09-28：个人设置与密码弹窗
+
+浏览器证据：`docs/verification/mobile-profile-avatar-dialog-2026-09-28.png` 与 `docs/verification/mobile-profile-password-dialog-2026-09-28.png`。个人设置由菜单项打开居中弹窗，只显示昵称和五张内置头像；密码菜单打开独立弹窗。原页面底部两个展开区已移除。390px 与 320px 视口无横向溢出，弹窗位于可视范围内；Esc 和关闭按钮可退出，浏览器无页面或资源错误。头像选择、非法选项拒绝、上传文件忽略和密码更新由 Django 测试覆盖。
+
+final result: passed

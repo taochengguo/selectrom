@@ -110,11 +110,12 @@ class TemplateContractTests(SimpleTestCase):
 
     def test_mobile_dashboard_uses_real_hero_asset_and_live_summary_data(self):
         html = self.read_project_file("templates/mobile/dashboard.html")
+        css = self.read_project_file("static/css/mobile.css")
 
-        self.assertIn("img/sampling-hero.png", html)
-        self.assertIn('class="mobile-hero"', html)
-        self.assertIn('class="summary-grid"', html)
-        self.assertIn("{{ summary.total }}", html)
+        self.assertIn("img/sampling-hero.png", css)
+        self.assertIn('class="mobile-feature mobile-feature--sampling"', html)
+        self.assertIn('class="mobile-metrics"', html)
+        self.assertIn("{{ summary.today }}", html)
         self.assertIn("{{ summary.completed }}", html)
         self.assertIsNotNone(finders.find("img/sampling-hero.png"))
 

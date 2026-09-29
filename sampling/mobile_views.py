@@ -1,3 +1,5 @@
+from datetime import datetime, time, timedelta
+
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
@@ -5,11 +7,13 @@ from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import sampler_required
 from accounts.forms import ProfileForm
+from accounts.models import User
 from sampling.models import PersonnelAssignment, SamplingBatch, SamplingTask
 from sampling.services.drawing import complete_task, draw_materials
 
@@ -122,19 +126,36 @@ def _serialize_batch(batch):
 @sampler_required
 def dashboard(request):
     tasks = _owned_tasks(request.user)
+    today = timezone.localdate()
+    today_start = timezone.make_aware(datetime.combine(today, time.min))
+    tomorrow_start = today_start + timedelta(days=1)
     summary = tasks.aggregate(
         total=Count("id"),
+        today=Count("id", filter=Q(planned_at__gte=today_start, planned_at__lt=tomorrow_start)),
         assigned=Count("id", filter=Q(status=SamplingTask.Status.ASSIGNED)),
         in_progress=Count("id", filter=Q(status=SamplingTask.Status.IN_PROGRESS)),
         completed=Count("id", filter=Q(status=SamplingTask.Status.COMPLETED)),
     )
+    query = request.GET.get("q", "").strip()[:100]
+    status = request.GET.get("status", "").strip()
+    period = request.GET.get("period", "").strip()
+    if query:
+        tasks = tasks.filter(Q(name__icontains=query) | Q(task_number__icontains=query))
+    if status in VISIBLE_STATUSES:
+        tasks = tasks.filter(status=status)
+    else:
+        status = ""
+    if period == "today":
+        tasks = tasks.filter(planned_at__gte=today_start, planned_at__lt=tomorrow_start)
+    else:
+        period = ""
     recent_tasks = tasks.select_related("personnel_group").order_by(
         "-updated_at", "-id"
-    )[:6]
+    )[:10]
     return render(
         request,
         "mobile/dashboard.html",
-        {"summary": summary, "recent_tasks": recent_tasks},
+        {"summary": summary, "recent_tasks": recent_tasks, "query": query, "status": status, "period": period},
     )
 
 
@@ -143,9 +164,12 @@ def reminders(request):
     tasks = _owned_tasks(request.user).select_related("personnel_group")
     # The current assignment is joined explicitly so unread state belongs to this user.
     tasks = tasks.filter(status__in=VISIBLE_STATUSES).order_by("-updated_at", "-id")
+    pending_count = tasks.filter(status=SamplingTask.Status.ASSIGNED).count()
     status = request.GET.get("status", "").strip()
     if status in VISIBLE_STATUSES:
         tasks = tasks.filter(status=status)
+    else:
+        status = ""
     assignments = {
         assignment.task_id: assignment
         for assignment in PersonnelAssignment.objects.filter(
@@ -158,6 +182,7 @@ def reminders(request):
         "mobile/reminders.html",
         {
             "task_rows": task_rows,
+            "pending_count": pending_count,
             "status": status,
             "status_choices": [
                 choice for choice in SamplingTask.Status.choices if choice[0] in VISIBLE_STATUSES
@@ -217,8 +242,7 @@ def task_complete(request, pk):
 def profile(request):
     action = request.POST.get("action") if request.method == "POST" else None
     profile_form = ProfileForm(
-        request.POST if action != "change_password" else None,
-        request.FILES if action != "change_password" else None,
+        request.POST if action == "update_profile" else None,
         instance=request.user,
     )
     password_form = PasswordChangeForm(
@@ -231,12 +255,26 @@ def profile(request):
             update_session_auth_hash(request, user)
             messages.success(request, "密码已更新")
             return redirect("mobile:profile")
-    elif request.method == "POST" and profile_form.is_valid():
+    elif request.method == "POST" and action == "update_profile" and profile_form.is_valid():
         profile_form.save()
         messages.success(request, "个人信息已更新")
         return redirect("mobile:profile")
+    summary = _owned_tasks(request.user).aggregate(
+        total=Count("id"),
+        assigned=Count("id", filter=Q(status=SamplingTask.Status.ASSIGNED)),
+        completed=Count("id", filter=Q(status=SamplingTask.Status.COMPLETED)),
+    )
     return render(
         request,
         "mobile/profile.html",
-        {"form": profile_form, "password_form": password_form},
+        {
+            "form": profile_form,
+            "password_form": password_form,
+            "summary": summary,
+            "avatar_url": static(f"img/{request.user.avatar_choice}.png"),
+            "avatar_options": [
+                {"value": value, "label": label, "url": static(f"img/{value}.png")}
+                for value, label in User.AvatarChoice.choices
+            ],
+        },
     )

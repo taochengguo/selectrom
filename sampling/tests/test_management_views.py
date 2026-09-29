@@ -383,7 +383,9 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, material.material_number)
         self.assertContains(response, self.sampler.username)
         self.assertContains(response, "版本 1")
-        self.assertContains(response, "draw.initial")
+        self.assertContains(response, "首次抽样")
+        self.assertContains(response, "状态：进行中")
+        self.assertNotContains(response, "draw.initial")
 
     def test_detail_hides_reassignment_when_authorized_redraw_is_pending(self):
         task = self.make_task(status=SamplingTask.Status.ASSIGNED)

@@ -55,7 +55,9 @@ class RoleGateTests(TestCase):
         response = self.client.post(
             reverse("accounts:profile"),
             {
+                "action": "update_profile",
                 "first_name": "抽样",
+                "avatar_choice": "icon3",
                 "last_name": "人员",
                 "phone": "13800138000",
                 "username": "changed-admin",
@@ -66,8 +68,9 @@ class RoleGateTests(TestCase):
         self.assertRedirects(response, reverse("accounts:profile"))
         self.sampler.refresh_from_db()
         self.assertEqual(self.sampler.first_name, "抽样")
-        self.assertEqual(self.sampler.last_name, "人员")
-        self.assertEqual(self.sampler.phone, "13800138000")
+        self.assertEqual(self.sampler.avatar_choice, "icon3")
+        self.assertEqual(self.sampler.last_name, "")
+        self.assertEqual(self.sampler.phone, "")
         self.assertEqual(self.sampler.username, "sampler")
         self.assertEqual(self.sampler.role, User.Role.SAMPLER)
 

@@ -33,6 +33,7 @@ from sampling.services.lifecycle import (
 class AdminUserCreateForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
+        labels = {"role": "用户角色", "phone": "手机号码", "is_active": "启用账号"}
         fields = (
             "username",
             "role",
@@ -46,6 +47,7 @@ class AdminUserCreateForm(UserCreationForm):
 class AdminUserEditForm(forms.ModelForm):
     class Meta:
         model = User
+        labels = {"role": "用户角色", "phone": "手机号码", "is_active": "启用账号"}
         fields = (
             "username",
             "role",
@@ -248,7 +250,9 @@ def task_candidate_add(request, pk):
         else:
             messages.success(request, "候选物资已添加")
     else:
-        messages.error(request, _error_text(ValidationError(form.errors.as_json())))
+        for field, errors in form.errors.items():
+            label = form.fields[field].label if field in form.fields else "物资信息"
+            messages.error(request, f"{label}：{'；'.join(errors)}")
     return redirect("management:task-detail", pk=task.pk)
 
 

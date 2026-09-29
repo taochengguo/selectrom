@@ -3,7 +3,7 @@ from io import BytesIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
-from django.urls import clear_url_caches, reverse
+from django.urls import clear_url_caches
 from PIL import Image
 
 from accounts.models import User
@@ -19,28 +19,20 @@ class DebugMediaServingTests(TestCase):
         )
         self.client.force_login(self.sampler)
 
-    def test_uploaded_profile_avatar_is_fetchable_in_debug(self):
+    def test_existing_uploaded_avatar_is_fetchable_in_debug(self):
         image_buffer = BytesIO()
         Image.new("RGB", (2, 2), color="blue").save(image_buffer, format="PNG")
         image_bytes = image_buffer.getvalue()
 
-        response = self.client.post(
-            reverse("mobile:profile"),
-            {
-                "action": "update_profile",
-                "first_name": "Avatar",
-                "avatar": SimpleUploadedFile(
-                    "debug-avatar.png", image_bytes, content_type="image/png"
-                ),
-            },
+        self.sampler.avatar.save(
+            "debug-avatar.png",
+            SimpleUploadedFile("debug-avatar.png", image_bytes, content_type="image/png"),
         )
         self.sampler.refresh_from_db()
         avatar_storage = self.sampler.avatar.storage
         avatar_name = self.sampler.avatar.name
         if avatar_name:
             self.addCleanup(avatar_storage.delete, avatar_name)
-        self.assertRedirects(response, reverse("mobile:profile"))
-
         try:
             with self.settings(DEBUG=True):
                 importlib.reload(root_urls)

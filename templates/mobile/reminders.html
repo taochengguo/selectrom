@@ -4,43 +4,25 @@
 {% block page_title %}任务提醒{% endblock %}
 
 {% block content %}
-  <section class="mobile-card" aria-labelledby="reminder-filter-heading">
-    <div class="section-heading">
-      <h2 id="reminder-filter-heading">任务筛选</h2>
-    </div>
-    <form class="filter-form" method="get">
-      <div class="field-group">
-        <label for="status">任务状态</label>
-        <select id="status" name="status">
-          <option value="">全部</option>
-          {% for value, label in status_choices %}
-            <option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <button type="submit">筛选</button>
-    </form>
+  <nav class="mobile-pills mobile-pills--reminders" aria-label="提醒状态">
+    <a href="{% url 'mobile:reminders' %}" class="mobile-pill{% if not status %} is-active{% endif %}">全部</a>
+    <a href="{% url 'mobile:reminders' %}?status=assigned" class="mobile-pill{% if status == 'assigned' %} is-active{% endif %}">待处理</a>
+    <a href="{% url 'mobile:reminders' %}?status=in_progress" class="mobile-pill{% if status == 'in_progress' %} is-active{% endif %}">进行中</a>
+    <a href="{% url 'mobile:reminders' %}?status=completed" class="mobile-pill{% if status == 'completed' %} is-active{% endif %}">已完成</a>
+  </nav>
+
+  <section class="mobile-feature mobile-feature--reminders" aria-labelledby="reminder-heading">
+    <div class="mobile-feature__copy"><h2 id="reminder-heading">待处理提醒 <strong>{{ pending_count }}</strong> 条</h2><p>请及时处理相关抽样任务</p><a class="mobile-feature__action mobile-feature__action--outline" href="{% url 'mobile:reminders' %}?status=assigned">一键查看 <i class="bi bi-chevron-right" aria-hidden="true"></i></a></div>
   </section>
 
-  <section class="mobile-card" aria-labelledby="reminder-list-heading">
-    <div class="section-heading">
-      <h2 id="reminder-list-heading">任务列表</h2>
-    </div>
-    <div class="task-list">
-      {% for task, assignment in task_rows %}
-        <article class="task-card">
-          <a class="task-card__link" href="{% url 'mobile:task-detail' task.pk %}">
-            <strong class="task-card__title">{{ task.name }}</strong>
-            <span class="task-card__meta">{{ task.task_number }}</span>
-            <span class="task-card__flags">
-              <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span>
-              {% if not assignment.viewed_at %}<span class="unread-badge">未读</span>{% endif %}
-            </span>
-          </a>
-        </article>
-      {% empty %}
-        <p class="empty-state">当前筛选条件下暂无任务</p>
-      {% endfor %}
-    </div>
+  <section class="reminder-list" aria-label="提醒列表">
+    {% for task, assignment in task_rows %}
+      <article class="reminder-card"><a class="reminder-card__link" href="{% url 'mobile:task-detail' task.pk %}">
+        <span class="reminder-card__icon{% if task.status == 'completed' %} reminder-card__icon--green{% elif task.status == 'in_progress' %} reminder-card__icon--blue{% endif %}"><i class="bi {% if task.status == 'completed' %}bi-file-earmark-check-fill{% elif task.status == 'in_progress' %}bi-pie-chart-fill{% else %}bi-clipboard-check-fill{% endif %}" aria-hidden="true"></i></span>
+        <span class="reminder-card__body"><strong>{{ task.name }}</strong><small><i class="bi bi-clock" aria-hidden="true"></i> {% if task.planned_at %}{{ task.planned_at|date:"Y-m-d H:i" }}{% else %}{{ task.updated_at|date:"Y-m-d H:i" }}{% endif %} · {{ task.task_number }}</small></span>
+        <span class="reminder-card__status"><span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span>{% if not assignment.viewed_at %}<span class="unread-badge">未读</span>{% endif %}</span>
+        <i class="bi bi-chevron-right reminder-card__arrow" aria-hidden="true"></i>
+      </a></article>
+    {% empty %}<p class="empty-state">当前筛选条件下暂无提醒</p>{% endfor %}
   </section>
 {% endblock %}

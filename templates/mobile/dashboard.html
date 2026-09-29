@@ -5,44 +5,50 @@
 {% block page_title %}随机抽样{% endblock %}
 
 {% block content %}
-  <section class="mobile-hero" aria-labelledby="hero-heading" style="background-image: url('{% static 'img/sampling-hero.png' %}')">
-    <div class="mobile-hero__copy">
-      <h2 id="hero-heading">随机抽样</h2>
-      <p>公平公正 · 科学抽样 · 规范透明</p>
-    </div>
+  <section class="mobile-search-panel" aria-label="搜索和筛选任务">
+    <form class="mobile-search" method="get">
+      <label class="mobile-search__field"><i class="bi bi-search" aria-hidden="true"></i><span class="sr-only">搜索任务名称或编号</span><input type="search" name="q" value="{{ query }}" placeholder="搜索任务名称或编号"></label>
+      <button class="mobile-search__button" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i><span>搜索</span></button>
+    </form>
+    <nav class="mobile-pills" aria-label="任务筛选">
+      <a href="{% url 'mobile:dashboard' %}{% if query %}?q={{ query|urlencode }}{% endif %}" class="mobile-pill{% if not status and not period %} is-active{% endif %}">全部任务</a>
+      <a href="{% url 'mobile:dashboard' %}?period=today{% if query %}&amp;q={{ query|urlencode }}{% endif %}" class="mobile-pill{% if period == 'today' %} is-active{% endif %}">今日任务</a>
+      <a href="{% url 'mobile:dashboard' %}?status=in_progress{% if query %}&amp;q={{ query|urlencode }}{% endif %}" class="mobile-pill{% if status == 'in_progress' %} is-active{% endif %}">进行中</a>
+    </nav>
   </section>
 
-  <section class="mobile-card" aria-labelledby="today-heading">
-    <div class="section-heading">
-      <h2 id="today-heading">今日抽样任务</h2>
-      <a class="section-heading__link" href="{% url 'mobile:reminders' %}">查看任务</a>
-    </div>
-    <dl class="summary-grid">
-      <div class="summary-item"><dt>任务总数</dt><dd>{{ summary.total }}</dd></div>
-      <div class="summary-item"><dt>待抽样</dt><dd>{{ summary.assigned }}</dd></div>
-      <div class="summary-item"><dt>进行中</dt><dd>{{ summary.in_progress }}</dd></div>
-      <div class="summary-item"><dt>已完成</dt><dd>{{ summary.completed }}</dd></div>
+  <section class="mobile-feature mobile-feature--sampling" aria-labelledby="hero-heading">
+    <div class="mobile-feature__copy"><h2 id="hero-heading">开始随机抽样</h2><p>从任务中随机抽取检查对象<br>高效规范 · 公平公正</p><a class="mobile-feature__action" href="{% url 'mobile:reminders' %}?status=assigned">开始抽样 <i class="bi bi-chevron-right" aria-hidden="true"></i></a></div>
+  </section>
+
+  <section class="mobile-card mobile-card--metrics" aria-label="任务概览">
+    <dl class="mobile-metrics">
+      <div><span class="metric-icon metric-icon--blue"><i class="bi bi-file-earmark-text-fill" aria-hidden="true"></i></span><dt>今日任务</dt><dd>{{ summary.today }}</dd></div>
+      <div><span class="metric-icon metric-icon--orange"><i class="bi bi-clock-fill" aria-hidden="true"></i></span><dt>待抽样</dt><dd>{{ summary.assigned }}</dd></div>
+      <div><span class="metric-icon metric-icon--green"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span><dt>已完成</dt><dd>{{ summary.completed }}</dd></div>
     </dl>
-    <a class="primary-action" href="{% url 'mobile:reminders' %}">开始抽样</a>
   </section>
 
-  <section class="mobile-card" aria-labelledby="recent-heading">
-    <div class="section-heading">
-      <h2 id="recent-heading">最近抽样记录</h2>
-      <a class="section-heading__link" href="{% url 'mobile:reminders' %}">全部记录</a>
+  <section class="mobile-card mobile-shortcuts" aria-labelledby="shortcuts-heading">
+    <div class="section-heading"><h2 id="shortcuts-heading">快捷功能</h2></div>
+    <div class="shortcut-grid">
+      <a href="{% url 'mobile:reminders' %}?status=assigned"><span class="shortcut-icon shortcut-icon--blue"><i class="bi bi-plus-lg" aria-hidden="true"></i></span><span>待抽样</span></a>
+      <a href="{% url 'mobile:reminders' %}?status=in_progress"><span class="shortcut-icon shortcut-icon--green"><i class="bi bi-people-fill" aria-hidden="true"></i></span><span>进行中</span></a>
+      <a href="{% url 'mobile:reminders' %}?status=completed"><span class="shortcut-icon shortcut-icon--orange"><i class="bi bi-file-earmark-check-fill" aria-hidden="true"></i></span><span>抽样记录</span></a>
+      <a href="{% url 'mobile:profile' %}"><span class="shortcut-icon shortcut-icon--purple"><i class="bi bi-person-gear" aria-hidden="true"></i></span><span>个人中心</span></a>
     </div>
+  </section>
+
+  <section class="mobile-card mobile-recent" aria-labelledby="recent-heading">
+    <div class="section-heading"><h2 id="recent-heading">最近任务</h2><a class="section-heading__link" href="{% url 'mobile:reminders' %}">查看更多 <i class="bi bi-chevron-right" aria-hidden="true"></i></a></div>
     <div class="task-list">
       {% for task in recent_tasks %}
-        <article class="task-card">
-          <a class="task-card__link" href="{% url 'mobile:task-detail' task.pk %}">
-            <strong class="task-card__title">{{ task.name }}</strong>
-            <span class="task-card__meta">{{ task.task_number }}</span>
-            <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span>
-          </a>
-        </article>
-      {% empty %}
-        <p class="empty-state">暂无抽样任务</p>
-      {% endfor %}
+        <article class="task-card"><a class="task-card__link" href="{% url 'mobile:task-detail' task.pk %}">
+          <span class="task-card__icon{% if task.status == 'completed' %} task-card__icon--green{% elif task.status == 'in_progress' %} task-card__icon--purple{% endif %}"><i class="bi bi-clipboard-check-fill" aria-hidden="true"></i></span>
+          <span class="task-card__content"><strong class="task-card__title">{{ task.name }}</strong><span class="task-card__meta">{{ task.task_number }}{% if task.planned_at %} · {{ task.planned_at|date:"m-d H:i" }}{% endif %}</span></span>
+          <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span><i class="bi bi-chevron-right task-card__arrow" aria-hidden="true"></i>
+        </a></article>
+      {% empty %}<p class="empty-state">当前筛选条件下暂无任务</p>{% endfor %}
     </div>
   </section>
 {% endblock %}

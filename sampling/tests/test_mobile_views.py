@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.staticfiles import finders
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import QuerySet
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -304,11 +305,13 @@ class MobileProfileTests(TestCase):
         )
         self.client.force_login(self.sampler)
 
-    def test_profile_updates_only_safe_fields(self):
+    def test_profile_updates_only_nickname_and_builtin_avatar(self):
         response = self.client.post(
             reverse("mobile:profile"),
             {
+                "action": "update_profile",
                 "first_name": "新名",
+                "avatar_choice": "icon4",
                 "last_name": "新姓",
                 "phone": "13800000000",
                 "username": "taken-over",
@@ -320,11 +323,51 @@ class MobileProfileTests(TestCase):
         self.assertRedirects(response, reverse("mobile:profile"))
         self.sampler.refresh_from_db()
         self.assertEqual(self.sampler.first_name, "新名")
-        self.assertEqual(self.sampler.last_name, "新姓")
-        self.assertEqual(self.sampler.phone, "13800000000")
+        self.assertEqual(self.sampler.avatar_choice, "icon4")
+        self.assertEqual(self.sampler.last_name, "旧姓")
+        self.assertEqual(self.sampler.phone, "10086")
         self.assertEqual(self.sampler.username, "profile_sampler")
         self.assertEqual(self.sampler.role, User.Role.SAMPLER)
         self.assertTrue(self.sampler.is_active)
+        self.assertEqual(
+            self.client.get(reverse("mobile:profile")).context["avatar_url"],
+            "/static/img/icon4.png",
+        )
+
+    def test_profile_does_not_accept_custom_avatar_upload(self):
+        response = self.client.post(
+            reverse("mobile:profile"),
+            {
+                "action": "update_profile",
+                "first_name": "新昵称",
+                "avatar_choice": "icon2",
+                "avatar": SimpleUploadedFile("custom.png", b"not-an-image", content_type="image/png"),
+            },
+        )
+        self.assertRedirects(response, reverse("mobile:profile"))
+        self.sampler.refresh_from_db()
+        self.assertFalse(self.sampler.avatar)
+        self.assertEqual(self.sampler.avatar_choice, "icon2")
+
+    def test_profile_rejects_avatar_outside_five_builtin_choices(self):
+        response = self.client.post(
+            reverse("mobile:profile"),
+            {"action": "update_profile", "first_name": "不应保存", "avatar_choice": "other"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="profile-dialog"')
+        self.sampler.refresh_from_db()
+        self.assertEqual(self.sampler.first_name, "旧名")
+
+    def test_profile_page_exposes_only_five_avatar_options_in_dialog(self):
+        response = self.client.get(reverse("mobile:profile"))
+        self.assertContains(response, 'id="profile-dialog"')
+        self.assertContains(response, 'id="password-dialog"')
+        self.assertNotContains(response, 'id="profile-settings"')
+        self.assertNotContains(response, 'id="password-settings"')
+        for number in range(1, 6):
+            self.assertContains(response, f"img/icon{number}.png")
+        self.assertNotContains(response, 'type="file"')
 
     def test_profile_post_requires_csrf(self):
         csrf_client = Client(enforce_csrf_checks=True)
