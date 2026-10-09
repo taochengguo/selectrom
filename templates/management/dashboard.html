@@ -4,7 +4,7 @@
   <section class="page-card">
     <div class="page-heading">
       <div><h2>工作台</h2><p>查看抽样任务执行概况</p></div>
-      <a class="button" href="{% url 'management:task-create' %}">创建任务</a>
+      <a class="button" href="{% url 'management:task-list' %}?create=1">创建任务</a>
     </div>
     <div class="summary-grid--desktop">
       <article class="summary-card"><strong>{{ summary.total }}</strong><span>任务总数</span></article>
@@ -21,15 +21,15 @@
     </div>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>任务编号</th><th>任务名称</th><th>抽样组</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th>任务编号</th><th>任务名称</th><th>抽样组</th><th>样品数量</th><th>抽样样品数</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>
         {% for task in recent_tasks %}
           <tr>
             <td>{{ task.task_number }}</td><td>{{ task.name }}</td>
-            <td>{{ task.personnel_group.name }}</td><td><span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span></td>
+            <td>{{ task.personnel_group.name }}</td><td>{% if task.sample_mode == 'unit' %}{{ task.sample_quantity|default:"待填写" }}{% else %}—{% endif %}</td><td>{{ task.draw_count|default:"待填写" }}</td><td><span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span></td>
             <td><a href="{% url 'management:task-detail' task.pk %}">查看</a></td>
           </tr>
-        {% empty %}<tr><td colspan="5">暂无任务</td></tr>{% endfor %}
+        {% empty %}<tr><td colspan="7">暂无任务</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>

@@ -23,6 +23,32 @@ class SamplingTaskForm(forms.ModelForm):
         ]
 
 
+class UnitSamplingTaskForm(forms.ModelForm):
+    class Meta:
+        model = SamplingTask
+        fields = [
+            "inspection_type", "purchase_order_number", "order_line_id",
+            "planned_inspection_date", "receiving_unit", "supplier_name",
+            "material_code", "material_name", "specification", "contact_name",
+            "receiver_phone", "delivery_address", "personnel_group",
+        ]
+        labels = {
+            "inspection_type": "质检类型", "purchase_order_number": "抽样采购订单号",
+            "order_line_id": "订单行项ID", "planned_inspection_date": "计划抽检日期",
+            "receiving_unit": "收货单位", "supplier_name": "供应商名称",
+            "material_code": "物资编码", "material_name": "物资名称",
+            "specification": "规格型号", "contact_name": "联系人",
+            "receiver_phone": "收货人电话", "delivery_address": "收货地址",
+            "personnel_group": "抽样人员分组",
+        }
+        widgets = {"planned_inspection_date": forms.DateInput(attrs={"type": "date"})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in self.fields:
+            self.fields[field_name].required = True
+
+
 class CandidateMaterialForm(forms.ModelForm):
     class Meta:
         model = CandidateMaterial

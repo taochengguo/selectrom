@@ -40,15 +40,25 @@ def _lock_batch_with_results(*, task, batch, actor, event_type):
     if batch.results.exists():
         raise ValueError("授权重抽批次必须为空")
 
-    selected_material_ids = secrets.SystemRandom().sample(
-        _candidate_ids(task), task.draw_count
-    )
-    SamplingResult.objects.bulk_create(
-        [
-            SamplingResult(batch=batch, material_id=material_id, sequence=sequence)
-            for sequence, material_id in enumerate(selected_material_ids, start=1)
+    if task.sample_mode == SamplingTask.SampleMode.UNIT:
+        selected_items = secrets.SystemRandom().sample(
+            range(1, task.sample_quantity + 1), task.draw_count
+        )
+        results = [
+            SamplingResult(batch=batch, sample_number=number, sequence=sequence)
+            for sequence, number in enumerate(selected_items, start=1)
         ]
-    )
+        result_snapshot = {"sample_numbers": selected_items}
+    else:
+        selected_items = secrets.SystemRandom().sample(
+            _candidate_ids(task), task.draw_count
+        )
+        results = [
+            SamplingResult(batch=batch, material_id=material_id, sequence=sequence)
+            for sequence, material_id in enumerate(selected_items, start=1)
+        ]
+        result_snapshot = {"material_ids": selected_items}
+    SamplingResult.objects.bulk_create(results)
     drawn_at = timezone.now()
     batch.status = SamplingBatch.Status.LOCKED
     batch.drawn_by = actor
@@ -65,14 +75,39 @@ def _lock_batch_with_results(*, task, batch, actor, event_type):
             "status": SamplingTask.Status.IN_PROGRESS,
             "batch_id": batch.id,
             "version": batch.version,
-            "material_ids": selected_material_ids,
+            **result_snapshot,
         },
     )
     return batch
 
 
+def _set_unit_counts(task, *, actor, sample_quantity, draw_count):
+    if task.sample_quantity is not None and task.draw_count is not None:
+        return
+    try:
+        quantity = int(sample_quantity)
+        count = int(draw_count)
+    except (TypeError, ValueError):
+        raise ValueError("请填写样品数量和抽样样品数") from None
+    if quantity <= 0 or count <= 0:
+        raise ValueError("样品数量和抽样样品数必须大于零")
+    if count > quantity:
+        raise ValueError("抽样样品数不能超过样品数量")
+    if count > 10000:
+        raise ValueError("单次最多抽取10000个样品")
+    task.sample_quantity = quantity
+    task.draw_count = count
+    task.full_clean()
+    task.save(update_fields=["sample_quantity", "draw_count", "updated_at"])
+    log_task_event(
+        task=task, actor=actor, event_type="task.sample_counts_set",
+        before={"sample_quantity": None, "draw_count": None},
+        after={"sample_quantity": quantity, "draw_count": count},
+    )
+
+
 @transaction.atomic
-def draw_materials(*, task_id: int, actor) -> SamplingBatch:
+def draw_materials(*, task_id: int, actor, sample_quantity=None, draw_count=None) -> SamplingBatch:
     task = _lock_task(task_id)
     _require_current_sampler(task, actor)
 
@@ -85,6 +120,8 @@ def draw_materials(*, task_id: int, actor) -> SamplingBatch:
     if authorized_redraw:
         if task.status != SamplingTask.Status.ASSIGNED:
             raise ValueError("任务当前状态不可执行")
+        if task.sample_mode == SamplingTask.SampleMode.UNIT:
+            _set_unit_counts(task, actor=actor, sample_quantity=sample_quantity, draw_count=draw_count)
         return _lock_batch_with_results(
             task=task,
             batch=authorized_redraw,
@@ -101,15 +138,18 @@ def draw_materials(*, task_id: int, actor) -> SamplingBatch:
     if latest_locked_batch:
         return latest_locked_batch
 
-    if task.sampling_batches.filter(kind=SamplingBatch.Kind.INITIAL).exists():
+    prepared_batch = task.sampling_batches.select_for_update().filter(
+        kind=SamplingBatch.Kind.INITIAL, status=SamplingBatch.Status.AUTHORIZED
+    ).first()
+    if task.sampling_batches.filter(kind=SamplingBatch.Kind.INITIAL).exists() and not prepared_batch:
         raise ValueError("首次抽样批次状态异常")
     if task.status != SamplingTask.Status.ASSIGNED:
         raise ValueError("未授权重抽")
+    if task.sample_mode == SamplingTask.SampleMode.UNIT:
+        _set_unit_counts(task, actor=actor, sample_quantity=sample_quantity, draw_count=draw_count)
 
-    batch = SamplingBatch.objects.create(
-        task=task,
-        version=1,
-        kind=SamplingBatch.Kind.INITIAL,
+    batch = prepared_batch or SamplingBatch.objects.create(
+        task=task, version=1, kind=SamplingBatch.Kind.INITIAL,
         status=SamplingBatch.Status.AUTHORIZED,
     )
     return _lock_batch_with_results(

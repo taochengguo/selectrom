@@ -3,5 +3,9 @@
 .env
 .venv/
 media/
+SamplingPhotos/
+.certs/
+.tools/
+startup.*.log
 __pycache__/
 *.py[cod]

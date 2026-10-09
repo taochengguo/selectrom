@@ -1,4 +1,6 @@
 from django.db import transaction
+from django.utils import timezone
+from uuid import uuid4
 
 from audit.services import log_task_event
 from sampling.models import CandidateMaterial, SamplingTask
@@ -23,6 +25,16 @@ _TASK_FIELDS = {
     "planned_at",
     "draw_count",
     "notes",
+    "sample_mode", "sample_quantity", "inspection_type", "purchase_order_number",
+    "order_line_id", "planned_inspection_date", "receiving_unit", "supplier_name",
+    "material_code", "material_name", "specification", "contact_name",
+    "receiver_phone", "delivery_address",
+}
+_UNIT_FIELDS = {
+    "inspection_type", "purchase_order_number", "order_line_id",
+    "planned_inspection_date", "receiving_unit", "supplier_name",
+    "material_code", "material_name", "specification", "contact_name",
+    "receiver_phone", "delivery_address", "personnel_group",
 }
 _CANDIDATE_FIELDS = {
     "material_number",
@@ -44,6 +56,20 @@ def _task_data(task):
         "personnel_group_id": task.personnel_group_id,
         "planned_at": task.planned_at.isoformat() if task.planned_at else None,
         "draw_count": task.draw_count,
+        "sample_mode": task.sample_mode,
+        "sample_quantity": task.sample_quantity,
+        "inspection_type": task.inspection_type,
+        "purchase_order_number": task.purchase_order_number,
+        "order_line_id": task.order_line_id,
+        "planned_inspection_date": task.planned_inspection_date.isoformat() if task.planned_inspection_date else None,
+        "receiving_unit": task.receiving_unit,
+        "supplier_name": task.supplier_name,
+        "material_code": task.material_code,
+        "material_name": task.material_name,
+        "specification": task.specification,
+        "contact_name": task.contact_name,
+        "receiver_phone": task.receiver_phone,
+        "delivery_address": task.delivery_address,
         "status": task.status,
         "notes": task.notes,
     }
@@ -62,13 +88,19 @@ def _candidate_data(candidate):
 
 def _ensure_candidate_mutable(task):
     # Candidate IDs are the frozen draw pool once a task has been assigned.
+    if task.sample_mode == SamplingTask.SampleMode.UNIT:
+        raise TaskFrozenError("样品序号抽样任务不使用候选物资")
     if task.status not in _MUTABLE_TASK_STATUSES:
         raise TaskFrozenError("任务已执行，候选物资不可修改")
 
 
 def _ensure_task_fields_mutable(task, changes):
     protected_fields = {"personnel_group", "draw_count"}
+    if task.sample_mode == SamplingTask.SampleMode.UNIT:
+        protected_fields |= _UNIT_FIELDS | {"sample_quantity", "name", "sample_mode"}
     if task.status not in _MUTABLE_TASK_STATUSES and protected_fields.intersection(changes):
+        if task.sample_mode == SamplingTask.SampleMode.UNIT:
+            raise TaskFrozenError("任务已执行，抽样信息不可修改")
         raise TaskFrozenError("任务已执行，抽样组和抽取数量不可修改")
 
 
@@ -95,6 +127,17 @@ def create_task(*, actor, **values):
         return task
 
 
+def create_unit_task(*, actor, **values):
+    _validate_fields(values, _UNIT_FIELDS)
+    return create_task(
+        actor=actor,
+        task_number=f"S-{timezone.localdate():%Y%m%d}-{uuid4().hex[:10].upper()}",
+        name=values["material_name"],
+        sample_mode=SamplingTask.SampleMode.UNIT,
+        **values,
+    )
+
+
 def update_task(*, task_id, actor, **changes):
     _validate_fields(changes, _TASK_FIELDS)
     with transaction.atomic():
@@ -103,6 +146,11 @@ def update_task(*, task_id, actor, **changes):
         before = _task_data(task)
         for field, value in changes.items():
             setattr(task, field, value)
+        if {"receiving_unit", "delivery_address"}.intersection(changes):
+            task.site_longitude = None
+            task.site_latitude = None
+            task.site_geocoded_at = None
+            task.site_city = ""
         task.full_clean()
         task.save()
         log_task_event(
@@ -123,11 +171,12 @@ def mark_task_ready(*, task_id, actor):
         if task.status != SamplingTask.Status.DRAFT:
             raise TaskFrozenError("任务已执行，不能改回待执行状态")
         before = _task_data(task)
-        candidate_count = task.candidates.count()
-        if task.draw_count <= 0:
-            raise ValueError("抽取数量必须大于零")
-        if task.draw_count > candidate_count:
-            raise ValueError("抽取数量不能超过候选物资数量")
+        if task.sample_mode == SamplingTask.SampleMode.MATERIAL:
+            candidate_count = task.candidates.count()
+            if not task.draw_count or task.draw_count <= 0:
+                raise ValueError("抽取数量必须大于零")
+            if task.draw_count > candidate_count:
+                raise ValueError("抽取数量不能超过候选物资数量")
         task.status = SamplingTask.Status.READY
         task.full_clean()
         task.save()

@@ -4,11 +4,12 @@ from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Prefetch
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_required
 from accounts.models import User
-from sampling.forms import CandidateMaterialForm, SamplingTaskForm
+from sampling.forms import CandidateMaterialForm, SamplingTaskForm, UnitSamplingTaskForm
 from sampling.models import (
     CandidateMaterial,
     SamplingBatch,
@@ -23,6 +24,7 @@ from sampling.services.lifecycle import (
     cancel_task,
     create_candidate,
     create_task,
+    create_unit_task,
     delete_candidate,
     mark_task_ready,
     update_candidate,
@@ -127,7 +129,7 @@ def dashboard(request):
 
 
 @admin_required
-def task_list(request):
+def task_list(request, creation_form=None, open_dialog=False):
     tasks = SamplingTask.objects.select_related("personnel_group").order_by(
         "-created_at", "-id"
     )
@@ -137,12 +139,29 @@ def task_list(request):
     return render(
         request,
         "management/tasks/list.html",
-        {"tasks": tasks, "status_choices": SamplingTask.Status.choices, "status": status},
+        {
+            "tasks": tasks, "status_choices": SamplingTask.Status.choices, "status": status,
+            "creation_form": creation_form or UnitSamplingTaskForm(),
+            "open_dialog": open_dialog or request.GET.get("create") == "1",
+        },
     )
 
 
 @admin_required
 def task_create(request):
+    if request.method == "GET":
+        return redirect(f"{reverse('management:task-list')}?create=1")
+    if request.POST.get("mode") == SamplingTask.SampleMode.UNIT:
+        form = UnitSamplingTaskForm(request.POST)
+        if form.is_valid():
+            try:
+                task = create_unit_task(actor=request.user, **form.cleaned_data)
+            except (ValidationError, ValueError) as error:
+                form.add_error(None, _error_text(error))
+            else:
+                messages.success(request, "抽样任务已创建")
+                return redirect("management:task-detail", pk=task.pk)
+        return task_list(request, creation_form=form, open_dialog=True)
     form = SamplingTaskForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -158,13 +177,16 @@ def task_create(request):
 @admin_required
 def task_edit(request, pk):
     task = get_object_or_404(SamplingTask, pk=pk)
-    form = SamplingTaskForm(request.POST or None, instance=task)
+    form_class = UnitSamplingTaskForm if task.sample_mode == SamplingTask.SampleMode.UNIT else SamplingTaskForm
+    form = form_class(request.POST or None, instance=task)
     if request.method == "POST" and form.is_valid():
         changes = {
             field: form.cleaned_data[field]
             for field in form.changed_data
             if field in form.cleaned_data
         }
+        if task.sample_mode == SamplingTask.SampleMode.UNIT and "material_name" in changes:
+            changes["name"] = changes["material_name"]
         try:
             if changes:
                 update_task(task_id=task.pk, actor=request.user, **changes)

@@ -9,14 +9,31 @@
     </div>
     <dl class="detail-summary">
       <div><dt>抽样组</dt><dd>{{ task.personnel_group.name }}</dd></div>
+      {% if task.sample_mode == 'unit' %}
+      <div><dt>质检类型</dt><dd>{{ task.inspection_type }}</dd></div>
+      <div><dt>抽样采购订单号</dt><dd>{{ task.purchase_order_number }}</dd></div>
+      <div><dt>订单行项ID</dt><dd>{{ task.order_line_id }}</dd></div>
+      <div><dt>计划抽检日期</dt><dd>{{ task.planned_inspection_date|date:"Y-m-d" }}</dd></div>
+      <div><dt>收货单位</dt><dd>{{ task.receiving_unit }}</dd></div>
+      <div><dt>供应商名称</dt><dd>{{ task.supplier_name }}</dd></div>
+      <div><dt>物资编码</dt><dd>{{ task.material_code }}</dd></div>
+      <div><dt>物资名称</dt><dd>{{ task.material_name }}</dd></div>
+      <div><dt>规格型号</dt><dd>{{ task.specification }}</dd></div>
+      <div><dt>联系人</dt><dd>{{ task.contact_name }}</dd></div>
+      <div><dt>收货人电话</dt><dd>{{ task.receiver_phone }}</dd></div>
+      <div><dt>收货地址</dt><dd>{{ task.delivery_address }}</dd></div>
+      <div><dt>样品数量</dt><dd>{{ task.sample_quantity|default:"待填写" }}</dd></div>
+      <div><dt>抽样样品数</dt><dd>{{ task.draw_count|default:"待填写" }}</dd></div>
+      {% else %}
       <div><dt>抽取数量</dt><dd>{{ task.draw_count }}</dd></div>
       <div><dt>计划时间</dt><dd>{{ task.planned_at|default:"未设置" }}</dd></div>
+      {% endif %}
       <div><dt>备注</dt><dd>{{ task.notes|default:"无" }}</dd></div>
     </dl>
     <div class="action-panel">
       <div class="action-row">
         <a class="button button--secondary" href="{% url 'management:task-edit' task.pk %}">编辑任务</a>
-        {% if task.status == 'draft' or task.status == 'ready' %}<a class="button button--secondary" href="{% url 'management:task-import' task.pk %}">CSV 导入</a>{% endif %}
+        {% if task.sample_mode == 'material' and task.status == 'draft' or task.sample_mode == 'material' and task.status == 'ready' %}<a class="button button--secondary" href="{% url 'management:task-import' task.pk %}">CSV 导入</a>{% endif %}
         {% if task.status == 'draft' %}
           <form class="inline-form" method="post" action="{% url 'management:task-ready' task.pk %}">{% csrf_token %}<button type="submit">设为待执行</button></form>
         {% endif %}
@@ -40,6 +57,7 @@
     </div>
   </section>
 
+  {% if task.sample_mode == 'material' %}
   <section class="page-card">
     <div class="page-heading"><div><h3>候选物资（{{ task.candidates.count }}）</h3><p>首次执行后候选范围将被冻结</p></div></div>
     {% if task.status == 'draft' or task.status == 'ready' %}
@@ -57,6 +75,7 @@
       </table>
     </div>
   </section>
+  {% endif %}
 
   <section class="page-card">
     <div class="page-heading"><div><h3>人员分配历史</h3><p>保留每次随机分配及候选人员快照</p></div></div>
@@ -76,7 +95,7 @@
         <article class="batch-card">
           <h4>版本 {{ batch.version }} · {{ batch.get_kind_display }} · {{ batch.get_status_display }}</h4>
           {% if batch.reason %}<p>原因：{{ batch.reason }}</p>{% endif %}
-          <ol>{% for result in batch.results.all %}<li>{{ result.material.material_number }} · {{ result.material.order_number }} · {{ result.material.supplier }} · {{ result.material.material_name }} · {{ result.material.quantity }}</li>{% empty %}<li>等待抽样人员执行</li>{% endfor %}</ol>
+          <ol>{% for result in batch.results.all %}<li>{% if task.sample_mode == 'unit' %}第 {{ result.sample_number }} 件样品{% else %}{{ result.material.material_number }} · {{ result.material.order_number }} · {{ result.material.supplier }} · {{ result.material.material_name }} · {{ result.material.quantity }}{% endif %}</li>{% empty %}<li>等待抽样人员执行</li>{% endfor %}</ol>
         </article>
       {% empty %}<p class="empty-state">暂无抽样批次</p>{% endfor %}
     </div>

@@ -1,0 +1,68 @@
+{% load static %}
+<section class="mobile-card sampling-report" data-sampling-report
+  data-batch-id="{{ report_batch.pk }}"
+  data-checkin-url="{% url 'mobile:task-report-checkin' task.pk report_batch.pk %}"
+  data-photos-url="{% url 'mobile:task-report-photos' task.pk report_batch.pk %}"
+  data-export-title="{{ task.task_number }}-{{ report_batch.version }}">
+  <div class="section-heading">
+    <div><h2>第 {{ report_batch.version }} 次抽样报告</h2><p>{{ report_batch.get_kind_display }} · {{ report_batch.drawn_at|date:"Y-m-d H:i" }}</p></div>
+    <button type="button" class="button button--secondary" data-export-report>导出抽检报告</button>
+  </div>
+
+  <div class="report-samples" data-report-samples>
+    <h3>抽样检测样品</h3>
+    <ul>
+      {% for result in report_batch.results.all %}
+        <li>{% if task.sample_mode == 'unit' %}第 {{ result.sample_number }} 件样品{% else %}{{ result.material.material_number }} · {{ result.material.material_name }}{% endif %}</li>
+      {% empty %}<li>暂无抽样结果</li>{% endfor %}
+    </ul>
+  </div>
+
+  <form class="sampling-report__form" data-report-form method="post" action="{% url 'mobile:task-report-save' task.pk report_batch.pk %}">
+    {% csrf_token %}
+    <label for="inspection-result-{{ report_batch.pk }}">抽样检测结果</label>
+    <textarea id="inspection-result-{{ report_batch.pk }}" name="inspection_result" rows="4" maxlength="12000" placeholder="记录检测数据、判定和现场情况">{% if report_batch.report_record %}{{ report_batch.report_record.inspection_result }}{% endif %}</textarea>
+    <button type="submit" class="button button--secondary">保存检测结果</button>
+    <span class="report-save-status" data-report-save-status aria-live="polite"></span>
+  </form>
+
+  <div class="sampling-report__checkin">
+    <div class="section-heading"><h3>现场打卡记录</h3><button type="button" data-site-checkin>现场打卡</button></div>
+    <p class="report-checkin-hint">收货地址：{{ task.receiving_unit }} {{ task.delivery_address }}（在收货地址所在地市即可打卡）</p>
+    <p class="report-checkin-error" data-checkin-error role="alert"></p>
+    <ul class="checkin-history" data-checkin-history>
+      {% if report_batch.report_record %}
+        {% for checkin in report_batch.report_record.checkins.all %}
+          <li data-checkin-row>
+            <strong>{{ checkin.get_status_display }}</strong>
+            <span>{{ checkin.created_at|date:"Y-m-d H:i:s" }} · {{ checkin.created_by.get_full_name|default:checkin.created_by.username }}</span>
+            {% if checkin.location_city %}<span>现场地市：{{ checkin.location_city }}</span>{% endif %}
+            {% if checkin.location_address %}<span>现场地址：{{ checkin.location_address }}</span>{% endif %}
+            {% if checkin.note %}<p>备注：{{ checkin.note }}</p>{% endif %}
+            {% if checkin.latitude and checkin.longitude %}<small>坐标：{{ checkin.longitude }}, {{ checkin.latitude }}</small>{% endif %}
+          </li>
+        {% endfor %}
+      {% endif %}
+    </ul>
+  </div>
+
+  <div class="sampling-report__photos">
+    <h3>编号样品照片</h3>
+    <div class="report-photo-upload" data-photo-empty>
+      <div class="report-photo-drop"><img class="report-photo-camera" src="{% static 'img/logo/camera.svg' %}" alt=""><strong>请上传编号样品照片</strong><small>支持拍照或从相册选择，最多可上传3张图片</small></div>
+      <div class="report-photo-actions"><button type="button" data-photo-camera><img src="{% static 'img/logo/camera.svg' %}" alt=""><span>拍照</span></button><button type="button" data-photo-album><img src="{% static 'img/logo/photo.svg' %}" alt=""><span>从相册选择</span></button></div>
+    </div>
+    <div class="report-photo-gallery" data-photo-gallery hidden>
+      <div class="report-photo-gallery-heading"><strong><img src="{% static 'img/logo/photo.svg' %}" alt="">已上传图片</strong><span>共 <span data-photo-count>0</span> 张　›</span></div>
+      <div class="report-photo-preview" data-report-photo-preview>
+        {% for photo in report_batch.photos.all %}
+          <div class="report-photo-tile" data-photo-id="{{ photo.pk }}" data-photo-url="{% url 'mobile:task-report-photo' task.pk report_batch.pk photo.pk %}"><img src="{% url 'mobile:task-report-photo' task.pk report_batch.pk photo.pk %}" alt="{{ photo.original_name }}"><button type="button" data-photo-delete data-delete-url="{% url 'mobile:task-report-photo-delete' task.pk report_batch.pk photo.pk %}" aria-label="删除照片">×</button></div>
+        {% endfor %}
+        <button type="button" class="report-photo-add" data-photo-add><span>＋</span>继续添加</button>
+      </div>
+    </div>
+    <input id="report-camera-{{ report_batch.pk }}" type="file" accept="image/*" capture="environment" data-photo-camera-input hidden>
+    <input id="report-album-{{ report_batch.pk }}" type="file" accept="image/*" multiple data-photo-album-input hidden>
+    <small class="report-photo-status" data-photo-status aria-live="polite"></small>
+  </div>
+</section>

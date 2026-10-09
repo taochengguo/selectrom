@@ -1,6 +1,9 @@
 <div id="sampling-results" class="result-grid" aria-live="polite">
   {% for result in results %}
     <article class="result-card">
+      {% if task.sample_mode == 'unit' %}
+      <h3>第 {{ result.sample_number }} 件样品</h3>
+      {% else %}
       <h3>{{ result.material.material_number }}</h3>
       <dl>
         <div><dt>订单号</dt><dd>{{ result.material.order_number }}</dd></div>
@@ -9,6 +12,7 @@
         <div><dt>物资数量</dt><dd>{{ result.material.quantity }}</dd></div>
         <div><dt>抽样数量</dt><dd>{{ task.draw_count }}</dd></div>
       </dl>
+      {% endif %}
     </article>
   {% empty %}
     <p class="empty-state">尚未生成抽样结果</p>

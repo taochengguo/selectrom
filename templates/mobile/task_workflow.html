@@ -1,0 +1,89 @@
+{% extends "mobile/base.html" %}
+{% load static %}
+{% block title %}{{ task.name }} · 抽样流程{% endblock %}
+{% block page_title %}随机抽样{% endblock %}
+{% block content %}
+<a class="workflow-back" href="{% url 'mobile:task-detail' task.pk %}">‹ 返回任务详情</a>
+<section class="mobile-card workflow-progress" aria-label="任务进度">
+  <p>{{ task.task_number }}</p>
+  <h2>{{ task.name }}</h2>
+  <ol class="workflow-steps">
+    <li class="{% if step >= 1 %}is-current{% endif %}">打卡</li>
+    <li class="{% if step >= 2 %}is-current{% endif %}">编号</li>
+    <li class="{% if step >= 3 %}is-current{% endif %}">抽样</li>
+    <li class="{% if step >= 4 %}is-current{% endif %}">结果</li>
+    <li class="{% if step >= 5 %}is-current{% endif %}">完成</li>
+  </ol>
+  <progress value="{{ step }}" max="5">{{ step }}/5</progress>
+</section>
+
+{% if step == 3 %}
+<section class="mobile-card sampling-stage" aria-labelledby="draw-heading">
+  <div class="section-heading"><h2 id="draw-heading">第三步 · 随机抽样</h2></div>
+  <p>编号照片已上传，现在开始随机抽取样品。</p>
+  <div id="sampling-reel" aria-live="polite">点击开始抽样</div>
+  <p id="sampling-error" role="alert"></p>
+  {% if draw_action %}
+  <form id="draw-form" method="post" action="{% url 'mobile:task-draw' task.pk %}">
+    {% csrf_token %}
+    {% if task.sample_mode == 'unit' and draw_action == 'initial' %}
+    <div class="sampling-count-fields">
+      <label>样品数量 <input name="sample_quantity" type="number" min="1" step="1" required></label>
+      <label>抽样样品数 <input name="draw_count" type="number" min="1" max="10000" step="1" required></label>
+    </div>
+    {% endif %}
+    <button id="draw-trigger" type="submit">开始随机抽样</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if step == 5 %}
+<section class="mobile-card workflow-summary">
+  <h2>此次抽样任务详情</h2>
+  <dl class="detail-list">
+    <div><dt>任务编号</dt><dd>{{ task.task_number }}</dd></div>
+    <div><dt>物资名称</dt><dd>{{ task.material_name|default:task.name }}</dd></div>
+    <div><dt>收货单位</dt><dd>{{ task.receiving_unit }}</dd></div>
+    <div><dt>收货地址</dt><dd>{{ task.delivery_address }}</dd></div>
+    <div><dt>样品数量</dt><dd>{{ task.sample_quantity }}</dd></div>
+    <div><dt>抽样样品数</dt><dd>{{ task.draw_count }}</dd></div>
+    <div><dt>任务状态</dt><dd>{{ task.get_status_display }}</dd></div>
+  </dl>
+</section>
+{% endif %}
+
+{% if step != 3 %}
+<div class="workflow-report workflow-report--step-{{ step }}">
+  {% include "mobile/sampling_report.html" %}
+</div>
+{% endif %}
+
+{% if step == 1 or step == 2 %}
+<p class="workflow-next"><a class="button" href="{% url 'mobile:task-workflow' task.pk %}">我已完成此步，继续</a></p>
+{% elif step == 4 %}
+<form class="mobile-card workflow-entry" method="post" action="{% url 'mobile:task-complete' task.pk %}">
+  {% csrf_token %}<button type="submit">完成抽样任务</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script type="module">
+  import { runSamplingAnimation } from "{% static 'js/sampling-animation.js' %}";
+  import "{% static 'js/sampling-report.js' %}";
+  const form = document.querySelector('#draw-form');
+  if (form) form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const trigger = form.querySelector('#draw-trigger');
+    const errorBox = document.querySelector('#sampling-error');
+    errorBox.textContent = '';
+    try {
+      await runSamplingAnimation({trigger, reel: document.querySelector('#sampling-reel'),
+        resultList: document.createElement('div'), endpoint: form.action,
+        csrfToken: form.querySelector('[name=csrfmiddlewaretoken]').value,
+        formData: new FormData(form)});
+      location.reload();
+    } catch (error) { errorBox.textContent = error.message; trigger.disabled = false; }
+  });
+</script>
+{% endblock %}

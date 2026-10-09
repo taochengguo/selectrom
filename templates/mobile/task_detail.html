@@ -12,12 +12,38 @@
     </div>
     <dl class="detail-list">
       <div><dt>任务编号</dt><dd>{{ task.task_number }}</dd></div>
+      {% if task.sample_mode == 'unit' %}
+      <div><dt>质检类型</dt><dd>{{ task.inspection_type }}</dd></div>
+      <div><dt>抽样采购订单号</dt><dd>{{ task.purchase_order_number }}</dd></div>
+      <div><dt>订单行项ID</dt><dd>{{ task.order_line_id }}</dd></div>
+      <div><dt>收货单位</dt><dd>{{ task.receiving_unit }}</dd></div>
+      <div><dt>供应商名称</dt><dd>{{ task.supplier_name }}</dd></div>
+      <div><dt>物资编码</dt><dd>{{ task.material_code }}</dd></div>
+      <div><dt>物资名称</dt><dd>{{ task.material_name }}</dd></div>
+      <div><dt>规格型号</dt><dd>{{ task.specification }}</dd></div>
+      <div><dt>联系人</dt><dd>{{ task.contact_name }}</dd></div>
+      <div><dt>收货人电话</dt><dd>{{ task.receiver_phone }}</dd></div>
+      <div><dt>收货地址</dt><dd>{{ task.delivery_address }}</dd></div>
+      <div><dt>样品数量</dt><dd>{{ task.sample_quantity|default:"待填写" }}</dd></div>
+      <div><dt>抽样样品数</dt><dd>{{ task.draw_count|default:"待填写" }}</dd></div>
+      <div><dt>计划抽检日期</dt><dd>{{ task.planned_inspection_date|date:"Y-m-d" }}</dd></div>
+      {% else %}
       <div><dt>候选物资</dt><dd>{{ candidate_count }} 个</dd></div>
       <div><dt>抽取数量</dt><dd>{{ task.draw_count }} 个</dd></div>
       <div><dt>计划时间</dt><dd>{{ task.planned_at|date:"Y-m-d H:i"|default:"未设置" }}</dd></div>
+      {% endif %}
       <div><dt>任务备注</dt><dd>{{ task.notes|default:"无" }}</dd></div>
     </dl>
   </article>
+
+  {% if task.status == 'assigned' or task.status == 'in_progress' or task.status == 'completed' %}
+    <form class="mobile-card workflow-entry" method="post" action="{% url 'mobile:task-start' task.pk %}">
+      {% csrf_token %}
+      <button type="submit">{% if task.status == 'completed' %}查看抽样详情与报告{% else %}开始随机抽样{% endif %}</button>
+    </form>
+  {% else %}
+    <div class="mobile-card workflow-entry"><button type="button" disabled>开始随机抽样</button><p>当前任务{{ task.get_status_display }}，无法开始。</p></div>
+  {% endif %}
 
   <section class="sampling-stage mobile-card" aria-labelledby="draw-heading">
     <div class="section-heading">
@@ -31,6 +57,12 @@
     {% if draw_action %}
       <form id="draw-form" method="post" action="{% url 'mobile:task-draw' task.pk %}">
         {% csrf_token %}
+        {% if task.sample_mode == 'unit' and draw_action == 'initial' %}
+          <div class="sampling-count-fields">
+            <label>样品数量 <input name="sample_quantity" type="number" min="1" step="1" inputmode="numeric" required></label>
+            <label>抽样样品数 <input name="draw_count" type="number" min="1" max="10000" step="1" inputmode="numeric" required></label>
+          </div>
+        {% endif %}
         <button id="draw-trigger" type="submit">
           {% if draw_action == 'redraw' %}开始重抽{% else %}开始抽样{% endif %}
         </button>
@@ -38,6 +70,10 @@
     {% endif %}
     {% include "mobile/draw_result.html" %}
   </section>
+
+  {% for report_batch in report_batches %}
+    {% include "mobile/sampling_report.html" %}
+  {% endfor %}
 
   {% if task.status == 'in_progress' %}
     <section class="mobile-card mobile-actions" aria-label="任务操作">
@@ -52,6 +88,7 @@
 {% block scripts %}
   <script type="module">
     import { runSamplingAnimation } from "{% static 'js/sampling-animation.js' %}";
+    import "{% static 'js/sampling-report.js' %}";
 
     const form = document.querySelector("#draw-form");
     const trigger = document.querySelector("#draw-trigger");
@@ -67,6 +104,7 @@
             resultList: document.querySelector("#sampling-results"),
             endpoint: form.action,
             csrfToken: form.querySelector("[name=csrfmiddlewaretoken]").value,
+            formData: new FormData(form),
           });
           window.location.reload();
         } catch (error) {

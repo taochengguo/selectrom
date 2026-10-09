@@ -45,7 +45,7 @@
       {% for task in recent_tasks %}
         <article class="task-card"><a class="task-card__link" href="{% url 'mobile:task-detail' task.pk %}">
           <span class="task-card__icon{% if task.status == 'completed' %} task-card__icon--green{% elif task.status == 'in_progress' %} task-card__icon--purple{% endif %}"><i class="bi bi-clipboard-check-fill" aria-hidden="true"></i></span>
-          <span class="task-card__content"><strong class="task-card__title">{{ task.name }}</strong><span class="task-card__meta">{{ task.task_number }}{% if task.planned_at %} · {{ task.planned_at|date:"m-d H:i" }}{% endif %}</span></span>
+          <span class="task-card__content"><strong class="task-card__title">{{ task.name }}</strong><span class="task-card__meta">{{ task.task_number }}{% if task.planned_inspection_date %} · {{ task.planned_inspection_date|date:"m-d" }}{% elif task.planned_at %} · {{ task.planned_at|date:"m-d H:i" }}{% endif %}</span>{% if task.sample_mode == 'unit' %}<span class="task-card__meta">样品数量 {{ task.sample_quantity|default:"待填写" }} · 抽样样品数 {{ task.draw_count|default:"待填写" }}</span>{% endif %}</span>
           <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span><i class="bi bi-chevron-right task-card__arrow" aria-hidden="true"></i>
         </a></article>
       {% empty %}<p class="empty-state">当前筛选条件下暂无任务</p>{% endfor %}

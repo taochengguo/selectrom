@@ -91,9 +91,19 @@ TIME_ZONE = "Asia/Shanghai"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+SAMPLING_PHOTOS_ROOT = BASE_DIR / "SamplingPhotos"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
+TIANDITU_API_KEY = os.getenv("TIANDITU_API_KEY", "")
+TIANDITU_DIRECT_EGRESS = os.getenv("TIANDITU_DIRECT_EGRESS", "false").lower() == "true"
+TIANDITU_DIRECT_SOURCE_IP = os.getenv("TIANDITU_DIRECT_SOURCE_IP", "")
+TIANDITU_DIRECT_INTERFACE_INDEX = os.getenv("TIANDITU_DIRECT_INTERFACE_INDEX", "")
+TIANDITU_DIRECT_DNS_SERVERS = [
+    server.strip()
+    for server in os.getenv("TIANDITU_DIRECT_DNS_SERVERS", "").split(",")
+    if server.strip()
+]

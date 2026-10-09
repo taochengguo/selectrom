@@ -101,6 +101,8 @@ def import_candidates(*, task_id, actor, csv_file):
     rows = _read_rows(csv_file)
     with transaction.atomic():
         task = SamplingTask.objects.select_for_update().get(pk=task_id)
+        if task.sample_mode == SamplingTask.SampleMode.UNIT:
+            raise TaskFrozenError("样品序号抽样任务不使用候选物资")
         if task.status not in _MUTABLE_TASK_STATUSES:
             raise TaskFrozenError("任务已执行，候选物资不可修改")
         validated_rows = _validate_rows(rows, task)
