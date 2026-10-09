@@ -1,0 +1,25 @@
+[Unit]
+Description=Selectrom Django application
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=selectrom
+Group=www-data
+WorkingDirectory=/opt/selectrom/current
+EnvironmentFile=/etc/selectrom/selectrom.env
+Environment=DJANGO_MEDIA_ROOT=/opt/selectrom/shared/media
+Environment=SAMPLING_PHOTOS_ROOT=/opt/selectrom/shared/SamplingPhotos
+ExecStart=/opt/selectrom/current/.venv/bin/gunicorn --workers 2 --timeout 120 --bind 127.0.0.1:8000 config.wsgi:application
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/selectrom/shared
+
+[Install]
+WantedBy=multi-user.target
