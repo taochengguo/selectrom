@@ -93,9 +93,24 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
-SAMPLING_PHOTOS_ROOT = BASE_DIR / "SamplingPhotos"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
+SAMPLING_PHOTOS_ROOT = Path(
+    os.getenv("SAMPLING_PHOTOS_ROOT", str(BASE_DIR / "SamplingPhotos"))
+)
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https")
+    if os.getenv("DJANGO_TRUST_PROXY_HTTPS", "false").lower() == "true"
+    else None
+)
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+SESSION_COOKIE_SECURE = os.getenv("DJANGO_SECURE_COOKIES", "false").lower() == "true"
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 TIANDITU_API_KEY = os.getenv("TIANDITU_API_KEY", "")

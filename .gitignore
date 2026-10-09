@@ -7,5 +7,6 @@ SamplingPhotos/
 .certs/
 .tools/
 startup.*.log
+staticfiles/
 __pycache__/
 *.py[cod]
