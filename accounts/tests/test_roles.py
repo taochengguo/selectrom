@@ -21,6 +21,17 @@ class RoleGateTests(TestCase):
 
         self.assertRedirects(response, "/manage/")
 
+    def test_login_remember_me_controls_session_expiry(self):
+        login_url = reverse("accounts:login")
+        credentials = {"username": "admin", "password": "Pass12345!"}
+
+        self.client.post(login_url, credentials)
+        self.assertTrue(self.client.session.get_expire_at_browser_close())
+
+        self.client.post(reverse("accounts:logout"))
+        self.client.post(login_url, {**credentials, "remember_me": "on"})
+        self.assertFalse(self.client.session.get_expire_at_browser_close())
+
     def test_sampler_login_redirects_to_mobile(self):
         response = self.client.post(
             reverse("accounts:login"),

@@ -17,6 +17,7 @@ def login_view(request):
     form = AuthenticationForm(request, data=request.POST or None)
     if request.method == "POST" and form.is_valid():
         login(request, form.get_user())
+        request.session.set_expiry(None if request.POST.get("remember_me") else 0)
         return _redirect_for_role(form.get_user())
     return render(request, "accounts/login.html", {"form": form})
 

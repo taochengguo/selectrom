@@ -4,22 +4,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>登录</title>
+  <title>登录 · 抽检工具</title>
   <link rel="icon" href="{% static 'img/sampling-hero.png' %}">
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
   <link rel="stylesheet" href="{% static 'css/management.css' %}">
+  <link rel="stylesheet" href="{% static 'css/login.css' %}?v=20261019-5">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
 </head>
 <body class="auth-body">
   <main class="auth-shell">
-    <section class="auth-card">
-      <h1>随机抽样系统</h1>
-      <p class="auth-card__intro">请使用您的系统账号登录</p>
-      <form class="form-card" method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">登录</button>
-      </form>
-    </section>
+    <header class="login-header">
+      <div class="login-brand"><span class="login-brand__mark"><i class="bi bi-shield-check" aria-hidden="true"></i></span><strong>抽检工具</strong><span class="login-brand__divider"></span><span class="login-brand__caption">科学抽检　规范管理　数据赋能　守护质量安全</span></div>
+      <span class="login-header__motto">让抽检更高效 · 让质量更放心</span>
+    </header>
+    <div class="login-layout">
+      <section class="login-story" aria-label="抽检平台介绍">
+        <div class="login-story__heading"><h1>抽检工具</h1><h2>现场抽样与抽检管理平台</h2><p>从现场到报告 · 全流程数字化管理</p><span class="login-story__rule" aria-hidden="true"></span></div>
+      </section>
+      <section class="auth-card" aria-labelledby="login-title">
+        <div class="auth-card__brand"><span class="auth-card__mark"><i class="bi bi-shield-check" aria-hidden="true"></i></span><h2 id="login-title">抽检工具</h2><p>现场抽样与抽检管理平台</p></div>
+        <form class="form-card login-form" method="post">
+          {% csrf_token %}
+          {% if form.non_field_errors %}<div class="login-form__errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+          <div class="login-form__field"><label class="visually-hidden" for="id_username">账号</label><i class="bi bi-person" aria-hidden="true"></i><input id="id_username" name="username" type="text" autocomplete="username" placeholder="账号" value="{{ form.username.value|default_if_none:'' }}" required autofocus></div>
+          {% if form.username.errors %}<div class="login-form__errors" role="alert">{{ form.username.errors }}</div>{% endif %}
+          <div class="login-form__field"><label class="visually-hidden" for="id_password">密码</label><i class="bi bi-lock" aria-hidden="true"></i><input id="id_password" name="password" type="password" autocomplete="current-password" placeholder="密码" required><button class="login-form__eye" type="button" aria-label="显示密码" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div>
+          {% if form.password.errors %}<div class="login-form__errors" role="alert">{{ form.password.errors }}</div>{% endif %}
+          <label class="login-form__remember"><input type="checkbox" name="remember_me" checked>记住我</label>
+          <button class="login-form__submit" type="submit">登录</button>
+        </form>
+      </section>
+    </div>
+    <div class="login-features" aria-label="平台功能">
+      <div class="login-feature"><span class="login-feature__icon login-feature__icon--green"><i class="bi bi-shuffle" aria-hidden="true"></i></span><strong>随机抽样</strong><span>科学规范<br>确保公平公正</span></div>
+      <div class="login-feature"><span class="login-feature__icon login-feature__icon--blue"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i></span><strong>定位打卡</strong><span>真实记录<br>防范虚假抽检</span></div>
+      <div class="login-feature"><span class="login-feature__icon login-feature__icon--purple"><i class="bi bi-camera-fill" aria-hidden="true"></i></span><strong>现场拍照</strong><span>拍照取证<br>留存真实现场</span></div>
+      <div class="login-feature"><span class="login-feature__icon login-feature__icon--orange"><i class="bi bi-card-text" aria-hidden="true"></i></span><strong>结果录入</strong><span>移动录入<br>提高工作效率</span></div>
+      <div class="login-feature"><span class="login-feature__icon login-feature__icon--blue"><i class="bi bi-bar-chart-fill" aria-hidden="true"></i></span><strong>报告导出</strong><span>自动生成<br>支持多格式导出</span></div>
+    </div>
+    <footer class="login-footer">让抽检更高效 · 让质量更放心</footer>
   </main>
+  <script>
+    const eye = document.querySelector('.login-form__eye');
+    const password = document.querySelector('#id_password');
+    eye.addEventListener('click', () => {
+      const visible = password.type === 'password';
+      password.type = visible ? 'text' : 'password';
+      eye.setAttribute('aria-label', visible ? '隐藏密码' : '显示密码');
+      eye.setAttribute('aria-pressed', String(visible));
+      eye.querySelector('i').className = visible ? 'bi bi-eye-slash' : 'bi bi-eye';
+    });
+  </script>
 </body>
 </html>
