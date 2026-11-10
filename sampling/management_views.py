@@ -1,6 +1,13 @@
 from django import forms
 from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
+from django.http import JsonResponse
+from django.http import FileResponse
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+from django.views.decorators.http import require_GET
 from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Prefetch
 from django.shortcuts import get_object_or_404, redirect, render
@@ -9,6 +16,7 @@ from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_required
 from accounts.models import User
+from personnel.models import PersonnelGroup
 from sampling.forms import CandidateMaterialForm, SamplingTaskForm, UnitSamplingTaskForm
 from sampling.models import (
     CandidateMaterial,
@@ -32,30 +40,58 @@ from sampling.services.lifecycle import (
 )
 
 
-class AdminUserCreateForm(UserCreationForm):
-    class Meta(UserCreationForm.Meta):
+class AdminUserCreateForm(forms.ModelForm):
+    password1 = forms.CharField(label="密码", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "placeholder": "请输入登录密码"}))
+
+    class Meta:
         model = User
-        labels = {"role": "用户角色", "phone": "手机号码", "is_active": "启用账号"}
-        fields = (
-            "username",
-            "role",
-            "first_name",
-            "last_name",
-            "phone",
-            "is_active",
-        )
+        labels = {"username": "用户名", "first_name": "用户姓名", "role": "用户角色", "is_active": "账号启用"}
+        fields = ("username", "password1", "first_name", "role")
+        widgets = {"username": forms.TextInput(attrs={"autocomplete": "off", "placeholder": "请输入登录用户名"}), "first_name": forms.TextInput(attrs={"placeholder": "请输入用户姓名"})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["role"].initial = User.Role.SAMPLER
+        self.fields["role"].choices = User.Role.choices
+        self.fields["first_name"].required = True
+
+    def _post_clean(self):
+        super()._post_clean()
+        password = self.cleaned_data.get("password1")
+        if password:
+            try:
+                validate_password(password, self.instance)
+            except ValidationError as error:
+                self.add_error("password1", error)
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.is_active = True
+        user.set_password(self.cleaned_data["password1"])
+        if commit:
+            user.save()
+        return user
+
+
+class AdminUserProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ("username", "first_name")
+        labels = {"username": "用户名", "first_name": "用户姓名"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["first_name"].required = True
 
 
 class AdminUserEditForm(forms.ModelForm):
     class Meta:
         model = User
-        labels = {"role": "用户角色", "phone": "手机号码", "is_active": "启用账号"}
+        labels = {"role": "用户角色", "first_name": "用户姓名", "is_active": "启用账号"}
         fields = (
             "username",
             "role",
             "first_name",
-            "last_name",
-            "phone",
             "is_active",
         )
 
@@ -148,6 +184,61 @@ def task_list(request, creation_form=None, open_dialog=False):
 
 
 @admin_required
+@require_GET
+def task_report(request, pk):
+    from sampling.services.report_pdf import build_report_pdf, report_filename
+    task = get_object_or_404(SamplingTask, pk=pk)
+    if task.status != SamplingTask.Status.COMPLETED:
+        messages.error(request, "未完成任务，无法查看抽样报告")
+        return redirect("management:task-list")
+    try:
+        filename = report_filename(task)
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("management:task-list")
+    batches = task.sampling_batches.filter(status="locked").order_by("-version")
+    return FileResponse(build_report_pdf(task, batches, FileSystemStorage(location=settings.SAMPLING_PHOTOS_ROOT)), filename=filename, content_type="application/pdf")
+
+
+@admin_required
+@require_POST
+def task_reports_export(request):
+    from tempfile import SpooledTemporaryFile
+    from zipfile import ZipFile, ZIP_DEFLATED
+    from sampling.services.report_pdf import build_report_pdf, report_filename
+    field = forms.ModelMultipleChoiceField(queryset=SamplingTask.objects.all())
+    try:
+        tasks = list(field.clean(request.POST.getlist("tasks")))
+    except forms.ValidationError:
+        messages.error(request, "请选择有效的任务后再导出")
+        return redirect("management:task-list")
+    if any(task.status != SamplingTask.Status.COMPLETED for task in tasks):
+        messages.error(request, "所选任务中存在未完成任务，无法导出，请仅选择已完成任务")
+        return redirect("management:task-list")
+    try:
+        filenames = [report_filename(task) for task in tasks]
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("management:task-list")
+    output = SpooledTemporaryFile(max_size=10 * 1024 * 1024)
+    storage = FileSystemStorage(location=settings.SAMPLING_PHOTOS_ROOT)
+    try:
+        with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+            used = set()
+            for task, filename in zip(tasks, filenames):
+                if filename in used:
+                    filename = filename[:-4] + f"_{task.pk}.pdf"
+                used.add(filename)
+                batches = task.sampling_batches.filter(status="locked").order_by("-version")
+                archive.writestr(filename, build_report_pdf(task, batches, storage).getvalue())
+        output.seek(0)
+        return FileResponse(output, as_attachment=True, filename="抽样报告.zip", content_type="application/zip")
+    except Exception:
+        output.close()
+        raise
+
+
+@admin_required
 def task_create(request):
     if request.method == "GET":
         return redirect(f"{reverse('management:task-list')}?create=1")
@@ -186,7 +277,7 @@ def task_edit(request, pk):
             if field in form.cleaned_data
         }
         if task.sample_mode == SamplingTask.SampleMode.UNIT and "material_name" in changes:
-            changes["name"] = changes["material_name"]
+            changes["name"] = changes["material_name"] or form.cleaned_data["purchase_order_number"]
         try:
             if changes:
                 update_task(task_id=task.pk, actor=request.user, **changes)
@@ -220,6 +311,15 @@ def task_detail(request, pk):
         ),
         pk=pk,
     )
+    assignments = list(task.personnel_assignments.all())
+    candidate_ids = {user_id for assignment in assignments for user_id in assignment.candidate_user_ids}
+    candidate_users = User.objects.in_bulk(candidate_ids)
+    for assignment in assignments:
+        assignment.candidate_names = [
+            (candidate_users[user_id].get_full_name() or "未填写姓名")
+            if user_id in candidate_users else f"人员记录不存在（编号 {user_id}）"
+            for user_id in assignment.candidate_user_ids
+        ]
     has_pending_redraw = any(
         batch.status == SamplingBatch.Status.AUTHORIZED
         for batch in task.sampling_batches.all()
@@ -235,6 +335,8 @@ def task_detail(request, pk):
             "candidate_form": CandidateMaterialForm(),
             "has_pending_redraw": has_pending_redraw,
             "can_reassign": can_reassign,
+            "assignments": assignments,
+            "reassign_groups": PersonnelGroup.objects.order_by("name") if can_reassign else [],
         },
     )
 
@@ -351,6 +453,7 @@ def task_reassign(request, pk):
         reassign_sampler,
         "已重新随机分配抽样人员",
         reason=request.POST.get("reason", ""),
+        personnel_group_id=request.POST.get("personnel_group") or None,
     )
 
 
@@ -375,7 +478,7 @@ def task_cancel(request, pk):
 @admin_required
 def user_list(request):
     users = User.objects.order_by("role", "username")
-    return render(request, "management/users/list.html", {"users": users})
+    return render(request, "management/users/list.html", {"users": users, "form": AdminUserCreateForm()})
 
 
 @admin_required
@@ -385,7 +488,7 @@ def user_create(request):
         form.save()
         messages.success(request, "用户已创建")
         return redirect("management:user-list")
-    return render(request, "management/users/form.html", {"form": form})
+    return render(request, "management/users/list.html", {"form": form, "users": User.objects.order_by("role", "username"), "open_dialog": True})
 
 
 @admin_required
@@ -399,6 +502,33 @@ def user_edit(request, pk):
         messages.success(request, "用户信息已更新")
         return redirect("management:user-list")
     return render(request, "management/users/form.html", {"form": form, "managed_user": user})
+
+
+@admin_required
+@require_POST
+def user_profile(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    form = AdminUserProfileForm(request.POST, instance=user)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+    form.save()
+    messages.success(request, "用户信息已更新")
+    return JsonResponse({"message": "用户信息已更新"})
+
+
+@admin_required
+@require_POST
+def user_role(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    # Reuse edit validation without replacing any other profile fields.
+    form = AdminUserEditForm({
+        "username": user.username, "first_name": user.first_name,
+        "is_active": user.is_active, "role": request.POST.get("role", ""),
+    }, instance=user, acting_user=request.user)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+    form.save()
+    return JsonResponse({"message": "用户角色已更新", "role": user.role})
 
 
 @admin_required
@@ -424,8 +554,14 @@ def user_reset_password(request, pk):
     form = SetPasswordForm(user, password_data)
     if form.is_valid():
         form.save()
+        if user.pk == request.user.pk:
+            update_session_auth_hash(request, user)
+        if request.headers.get("Accept") == "application/json":
+            return JsonResponse({"message": "密码已更新"})
         messages.success(request, "密码已重置")
     else:
+        if request.headers.get("Accept") == "application/json":
+            return JsonResponse({"errors": form.errors}, status=400)
         for field_errors in form.errors.values():
             for error in field_errors:
                 messages.error(request, error)

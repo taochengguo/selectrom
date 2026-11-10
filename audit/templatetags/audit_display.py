@@ -33,12 +33,28 @@ FIELD_LABELS = {
     "material_code": "物资编码", "specification": "规格型号",
     "contact_name": "联系人", "receiver_phone": "收货人电话",
     "delivery_address": "收货地址", "sample_numbers": "抽样样品序号",
+    "detailed_address": "详细地址",
+    "personnel_group_name": "抽样组名称",
 }
 
 
 @register.filter
 def event_label(value):
     return EVENT_LABELS.get(value, value)
+
+
+@register.filter
+def audit_summary(log):
+    label = EVENT_LABELS.get(log.event_type, log.event_type)
+    before, after = log.before_data, log.after_data
+    if log.event_type.endswith("updated"):
+        changed = [FIELD_LABELS.get(key, key) for key in dict.fromkeys([*before, *after]) if before.get(key) != after.get(key)]
+        return "修改了" + "、".join(changed[:3]) + ("等字段" if len(changed) > 3 else "") if changed else "资料未发生变化"
+    if after.get("reason"):
+        return f"{label}：{after['reason']}"
+    if "sample_numbers" in after:
+        return f"{label}，抽取 {len(after['sample_numbers'])} 个样品"
+    return label
 
 
 @register.filter

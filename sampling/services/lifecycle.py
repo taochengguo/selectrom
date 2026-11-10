@@ -28,13 +28,13 @@ _TASK_FIELDS = {
     "sample_mode", "sample_quantity", "inspection_type", "purchase_order_number",
     "order_line_id", "planned_inspection_date", "receiving_unit", "supplier_name",
     "material_code", "material_name", "specification", "contact_name",
-    "receiver_phone", "delivery_address",
+    "receiver_phone", "delivery_address", "detailed_address",
 }
 _UNIT_FIELDS = {
     "inspection_type", "purchase_order_number", "order_line_id",
     "planned_inspection_date", "receiving_unit", "supplier_name",
     "material_code", "material_name", "specification", "contact_name",
-    "receiver_phone", "delivery_address", "personnel_group",
+    "receiver_phone", "delivery_address", "detailed_address", "personnel_group", "sample_quantity", "draw_count",
 }
 _CANDIDATE_FIELDS = {
     "material_number",
@@ -70,6 +70,7 @@ def _task_data(task):
         "contact_name": task.contact_name,
         "receiver_phone": task.receiver_phone,
         "delivery_address": task.delivery_address,
+        "detailed_address": task.detailed_address,
         "status": task.status,
         "notes": task.notes,
     }
@@ -132,7 +133,7 @@ def create_unit_task(*, actor, **values):
     return create_task(
         actor=actor,
         task_number=f"S-{timezone.localdate():%Y%m%d}-{uuid4().hex[:10].upper()}",
-        name=values["material_name"],
+        name=values.get("material_name") or values.get("purchase_order_number", "抽样任务"),
         sample_mode=SamplingTask.SampleMode.UNIT,
         **values,
     )

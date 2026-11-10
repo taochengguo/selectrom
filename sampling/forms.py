@@ -27,10 +27,10 @@ class UnitSamplingTaskForm(forms.ModelForm):
     class Meta:
         model = SamplingTask
         fields = [
-            "inspection_type", "purchase_order_number", "order_line_id",
+            "purchase_order_number", "inspection_type", "order_line_id",
             "planned_inspection_date", "receiving_unit", "supplier_name",
             "material_code", "material_name", "specification", "contact_name",
-            "receiver_phone", "delivery_address", "personnel_group",
+            "receiver_phone", "delivery_address", "detailed_address", "personnel_group", "sample_quantity", "draw_count",
         ]
         labels = {
             "inspection_type": "质检类型", "purchase_order_number": "抽样采购订单号",
@@ -40,13 +40,28 @@ class UnitSamplingTaskForm(forms.ModelForm):
             "specification": "规格型号", "contact_name": "联系人",
             "receiver_phone": "收货人电话", "delivery_address": "收货地址",
             "personnel_group": "抽样人员分组",
+            "detailed_address": "详细地址", "sample_quantity": "样品数量", "draw_count": "抽样数量",
         }
         widgets = {"planned_inspection_date": forms.DateInput(attrs={"type": "date"})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in self.fields:
-            self.fields[field_name].required = True
+            self.fields[field_name].required = field_name == "purchase_order_number"
+        self.fields["sample_quantity"].min_value = 1
+        self.fields["draw_count"].min_value = 1
+        self.fields["draw_count"].max_value = 10000
+
+    def clean(self):
+        data = super().clean()
+        quantity, count = data.get("sample_quantity"), data.get("draw_count")
+        if quantity is not None and quantity <= 0:
+            self.add_error("sample_quantity", "样品数量必须大于零")
+        if count is not None and not 1 <= count <= 10000:
+            self.add_error("draw_count", "抽样数量必须在1至10000之间")
+        if quantity and count and count > quantity:
+            self.add_error("draw_count", "抽样数量不能超过样品数量")
+        return data
 
 
 class CandidateMaterialForm(forms.ModelForm):

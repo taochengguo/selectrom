@@ -5,7 +5,9 @@
 {% block page_title %}任务详情{% endblock %}
 
 {% block content %}
+  {% if report_details %}<a class="workflow-back" href="{% url 'mobile:task-detail' task.pk %}">‹ 返回任务详情</a>{% endif %}
   <article class="mobile-card">
+    {% if report_details %}<h2 class="report-detail-title">任务详情</h2>{% endif %}
     <div class="section-heading">
       <h2>{{ task.name }}</h2>
       <span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span>
@@ -24,6 +26,7 @@
       <div><dt>联系人</dt><dd>{{ task.contact_name }}</dd></div>
       <div><dt>收货人电话</dt><dd>{{ task.receiver_phone }}</dd></div>
       <div><dt>收货地址</dt><dd>{{ task.delivery_address }}</dd></div>
+      <div><dt>详细地址</dt><dd>{{ task.detailed_address|default:"未填写" }}</dd></div>
       <div><dt>样品数量</dt><dd>{{ task.sample_quantity|default:"待填写" }}</dd></div>
       <div><dt>抽样样品数</dt><dd>{{ task.draw_count|default:"待填写" }}</dd></div>
       <div><dt>计划抽检日期</dt><dd>{{ task.planned_inspection_date|date:"Y-m-d" }}</dd></div>
@@ -36,7 +39,13 @@
     </dl>
   </article>
 
-  {% if task.status == 'assigned' or task.status == 'in_progress' or task.status == 'completed' %}
+  {% if report_details %}
+  {% elif task.status == 'completed' %}
+    <section class="mobile-card workflow-entry completed-task-actions">
+      <a class="button" href="{% url 'mobile:task-report-detail' task.pk %}">抽样报告详情</a>
+      <a class="button" href="{% url 'mobile:task-report-pdf' task.pk %}" download>导出报告</a>
+    </section>
+  {% elif task.status == 'assigned' or task.status == 'in_progress' %}
     <form class="mobile-card workflow-entry" method="post" action="{% url 'mobile:task-start' task.pk %}">
       {% csrf_token %}
       <button type="submit">{% if task.status == 'completed' %}查看抽样详情与报告{% else %}开始随机抽样{% endif %}</button>
@@ -45,6 +54,7 @@
     <div class="mobile-card workflow-entry"><button type="button" disabled>开始随机抽样</button><p>当前任务{{ task.get_status_display }}，无法开始。</p></div>
   {% endif %}
 
+  {% if task.status != 'completed' %}
   <section class="sampling-stage mobile-card" aria-labelledby="draw-heading">
     <div class="section-heading">
       <h2 id="draw-heading">抽样结果</h2>
@@ -59,8 +69,8 @@
         {% csrf_token %}
         {% if task.sample_mode == 'unit' and draw_action == 'initial' %}
           <div class="sampling-count-fields">
-            <label>样品数量 <input name="sample_quantity" type="number" min="1" step="1" inputmode="numeric" required></label>
-            <label>抽样样品数 <input name="draw_count" type="number" min="1" max="10000" step="1" inputmode="numeric" required></label>
+            <label>样品数量 <input name="sample_quantity" value="{{ task.sample_quantity|default_if_none:'' }}" type="number" min="1" step="1" inputmode="numeric" required></label>
+            <label>抽样样品数 <input name="draw_count" value="{{ task.draw_count|default_if_none:'' }}" type="number" min="1" max="10000" step="1" inputmode="numeric" required></label>
           </div>
         {% endif %}
         <button id="draw-trigger" type="submit">
@@ -71,9 +81,12 @@
     {% include "mobile/draw_result.html" %}
   </section>
 
+  {% endif %}
+  <div id="completed-reports"{% if task.status == 'completed' and not report_details %} hidden{% endif %}>
   {% for report_batch in report_batches %}
     {% include "mobile/sampling_report.html" %}
   {% endfor %}
+  </div>
 
   {% if task.status == 'in_progress' %}
     <section class="mobile-card mobile-actions" aria-label="任务操作">

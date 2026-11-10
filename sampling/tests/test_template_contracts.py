@@ -112,12 +112,12 @@ class TemplateContractTests(SimpleTestCase):
         html = self.read_project_file("templates/mobile/dashboard.html")
         css = self.read_project_file("static/css/mobile.css")
 
-        self.assertIn("img/sampling-hero.png", css)
+        self.assertIn("img/sampling-hero.webp", css)
         self.assertIn('class="mobile-feature mobile-feature--sampling"', html)
         self.assertIn('class="mobile-metrics"', html)
         self.assertIn("{{ summary.today }}", html)
         self.assertIn("{{ summary.completed }}", html)
-        self.assertIsNotNone(finders.find("img/sampling-hero.png"))
+        self.assertIsNotNone(finders.find("img/sampling-hero.webp"))
 
     def test_mobile_draw_hooks_are_preserved_inside_responsive_components(self):
         detail = self.read_project_file("templates/mobile/task_detail.html")

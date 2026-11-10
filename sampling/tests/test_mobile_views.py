@@ -300,7 +300,6 @@ class MobileProfileTests(TestCase):
             role=User.Role.SAMPLER,
             first_name="旧名",
             last_name="旧姓",
-            phone="10086",
             is_active=True,
         )
         self.client.force_login(self.sampler)
@@ -325,13 +324,13 @@ class MobileProfileTests(TestCase):
         self.assertEqual(self.sampler.first_name, "新名")
         self.assertEqual(self.sampler.avatar_choice, "icon4")
         self.assertEqual(self.sampler.last_name, "旧姓")
-        self.assertEqual(self.sampler.phone, "10086")
+        self.assertFalse(hasattr(self.sampler, "phone"))
         self.assertEqual(self.sampler.username, "profile_sampler")
         self.assertEqual(self.sampler.role, User.Role.SAMPLER)
         self.assertTrue(self.sampler.is_active)
         self.assertEqual(
             self.client.get(reverse("mobile:profile")).context["avatar_url"],
-            "/static/img/icon4.png",
+            "/static/img/icon4.webp",
         )
 
     def test_profile_does_not_accept_custom_avatar_upload(self):
@@ -366,7 +365,7 @@ class MobileProfileTests(TestCase):
         self.assertNotContains(response, 'id="profile-settings"')
         self.assertNotContains(response, 'id="password-settings"')
         for number in range(1, 6):
-            self.assertContains(response, f"img/icon{number}.png")
+            self.assertContains(response, f"img/icon{number}.webp")
         self.assertNotContains(response, 'type="file"')
 
     def test_profile_post_requires_csrf(self):

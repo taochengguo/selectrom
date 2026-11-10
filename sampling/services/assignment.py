@@ -4,9 +4,12 @@ from django.db import transaction
 
 from audit.services import log_task_event
 from sampling.models import PersonnelAssignment, SamplingBatch, SamplingTask
+from personnel.models import PersonnelGroup
 
 
 def _candidate_user_ids(task):
+    if not task.personnel_group_id:
+        raise ValueError("请先选择抽样人员分组，再执行任务")
     return list(
         task.personnel_group.members.order_by("id").values_list("id", flat=True)
     )
@@ -59,7 +62,7 @@ def assign_sampler(*, task_id: int, actor):
 
 
 @transaction.atomic
-def reassign_sampler(*, task_id: int, actor, reason: str):
+def reassign_sampler(*, task_id: int, actor, reason: str, personnel_group_id=None):
     reason = reason.strip()
     if not reason:
         raise ValueError("重分配原因不能为空")
@@ -82,6 +85,13 @@ def reassign_sampler(*, task_id: int, actor, reason: str):
     if len(current_assignments) != 1:
         raise ValueError("任务当前分配记录异常")
     previous_assignment = current_assignments[0]
+    previous_group_id = task.personnel_group_id
+    previous_group_name = task.personnel_group.name if task.personnel_group_id else ""
+    if personnel_group_id is not None:
+        try:
+            task.personnel_group = PersonnelGroup.objects.select_for_update().get(pk=personnel_group_id)
+        except (PersonnelGroup.DoesNotExist, ValueError, TypeError):
+            raise ValueError("请选择有效的抽样人员分组") from None
     candidate_user_ids = _require_candidates(task)
     selected_user_id = secrets.choice(candidate_user_ids)
 
@@ -96,16 +106,21 @@ def reassign_sampler(*, task_id: int, actor, reason: str):
         is_current=True,
         created_by=actor,
     )
+    task.save(update_fields=["personnel_group", "updated_at"])
     log_task_event(
         task=task,
         actor=actor,
         event_type="assignment.reassigned",
         before={
+            "personnel_group_id": previous_group_id,
+            "personnel_group_name": previous_group_name,
             "assignment_id": previous_assignment.id,
             "candidate_user_ids": previous_assignment.candidate_user_ids,
             "selected_user_id": previous_assignment.selected_user_id,
         },
         after={
+            "personnel_group_id": task.personnel_group_id,
+            "personnel_group_name": task.personnel_group.name,
             "assignment_id": assignment.id,
             "candidate_user_ids": candidate_user_ids,
             "selected_user_id": selected_user_id,

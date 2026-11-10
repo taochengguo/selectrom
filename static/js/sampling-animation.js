@@ -50,14 +50,59 @@ export async function runSamplingAnimation({
   if (labels.length === 0) {
     throw new Error("抽样结果为空");
   }
-  let tick = 0;
-  const timer = window.setInterval(() => {
-    reel.textContent = labels[tick % labels.length];
-    tick += 1;
-  }, 70);
-  await new Promise((resolve) => window.setTimeout(resolve, 1400));
-  window.clearInterval(timer);
-  reel.textContent = labels[labels.length - 1];
+  const progress = reel.querySelector('.sampling-progress');
+  const chamber = reel.querySelector('.sampling-chamber');
+  const output = reel.querySelector('.sampling-picked');
+  output.replaceChildren();
+  const size = chamber.clientWidth;
+  const diameter = 38;
+  const radius = (size - diameter) / 2 - 6;
+  const center = size / 2;
+  const poolSize = Number(formData.get('sample_quantity')) || Math.max(18, labels.length);
+  const balls = Array.from({length: Math.min(18, poolSize)}, (_, index) => {
+    const element = document.createElement('span');
+    element.className = 'sampling-ball';
+    element.textContent = String(index + 1).padStart(2, '0');
+    chamber.append(element);
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.sqrt(Math.random()) * radius;
+    return {element, x: center + Math.cos(angle) * distance - diameter / 2,
+      y: center + Math.sin(angle) * distance - diameter / 2,
+      vx: (Math.random() - .5) * 4, vy: (Math.random() - .5) * 4};
+  });
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let frame;
+  const animate = () => {
+    for (const ball of balls) {
+      ball.x += ball.vx; ball.y += ball.vy;
+      const dx = ball.x + diameter / 2 - center;
+      const dy = ball.y + diameter / 2 - center;
+      const distance = Math.hypot(dx, dy);
+      if (distance > radius) {
+        const nx = dx / distance, ny = dy / distance;
+        const dot = ball.vx * nx + ball.vy * ny;
+        ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny;
+        ball.x = center + nx * radius - diameter / 2;
+        ball.y = center + ny * radius - diameter / 2;
+      }
+      ball.element.style.transform = `translate(${ball.x}px, ${ball.y}px)`;
+    }
+    frame = requestAnimationFrame(animate);
+  };
+  if (!reducedMotion) animate();
+  progress.textContent = `抽样进度：0 / ${labels.length}`;
+  try {
+    await new Promise(resolve => setTimeout(resolve, reducedMotion ? 0 : 3000));
+    for (const [index, label] of labels.entries()) {
+      const ball = document.createElement('span');
+      ball.className = 'sampling-ball sampling-ball--picked';
+      ball.textContent = label;
+      output.append(ball);
+      progress.textContent = `抽样进度：${index + 1} / ${labels.length}`;
+      await new Promise(resolve => setTimeout(resolve, reducedMotion ? 0 : 1200));
+    }
+    await new Promise(resolve => setTimeout(resolve, reducedMotion ? 0 : 1000));
+  } finally { if (frame) cancelAnimationFrame(frame); }
   resultList.replaceChildren(...payload.results.map(renderResultCard));
   return payload;
 }

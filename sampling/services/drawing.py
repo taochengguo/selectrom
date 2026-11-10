@@ -82,11 +82,12 @@ def _lock_batch_with_results(*, task, batch, actor, event_type):
 
 
 def _set_unit_counts(task, *, actor, sample_quantity, draw_count):
-    if task.sample_quantity is not None and task.draw_count is not None:
+    if task.sampling_batches.filter(status=SamplingBatch.Status.LOCKED).exists():
         return
+    before = {"sample_quantity": task.sample_quantity, "draw_count": task.draw_count}
     try:
-        quantity = int(sample_quantity)
-        count = int(draw_count)
+        quantity = int(task.sample_quantity if sample_quantity is None else sample_quantity)
+        count = int(task.draw_count if draw_count is None else draw_count)
     except (TypeError, ValueError):
         raise ValueError("请填写样品数量和抽样样品数") from None
     if quantity <= 0 or count <= 0:
@@ -101,7 +102,7 @@ def _set_unit_counts(task, *, actor, sample_quantity, draw_count):
     task.save(update_fields=["sample_quantity", "draw_count", "updated_at"])
     log_task_event(
         task=task, actor=actor, event_type="task.sample_counts_set",
-        before={"sample_quantity": None, "draw_count": None},
+        before=before,
         after={"sample_quantity": quantity, "draw_count": count},
     )
 

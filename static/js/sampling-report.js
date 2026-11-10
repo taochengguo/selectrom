@@ -27,7 +27,7 @@ function renderCheckin(history, item) {
     appendTextElement(row, "span", `现场地址：${item.location_address}`);
   }
   if (item.note) appendTextElement(row, "p", `备注：${item.note}`);
-  history.prepend(row);
+  history.replaceChildren(row);
 }
 
 function addPhotoPreviews(report) {
@@ -47,10 +47,15 @@ function addPhotoPreviews(report) {
     gallery.hidden = total === 0;
     add.hidden = total >= 3;
   };
+  const dialog = report.querySelector("[data-photo-dialog]");
   const selectAlbum = () => album.click();
-  report.querySelector("[data-photo-camera]").addEventListener("click", () => camera.click());
-  report.querySelector("[data-photo-album]").addEventListener("click", selectAlbum);
-  add.addEventListener("click", selectAlbum);
+  const openPicker = () => dialog.showModal();
+  report.querySelector("[data-photo-picker]").addEventListener("click", openPicker);
+  report.querySelector("[data-photo-camera]").addEventListener("click", () => { dialog.close(); camera.click(); });
+  report.querySelector("[data-photo-album]").addEventListener("click", () => { dialog.close(); selectAlbum(); });
+  report.querySelector("[data-photo-cancel]").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+  add.addEventListener("click", openPicker);
   for (const input of [camera, album]) input.addEventListener("change", async () => {
     const files = [...input.files];
     const remaining = 3 - preview.querySelectorAll("[data-photo-id]").length;
@@ -131,7 +136,9 @@ function exportReport(report) {
   }
   appendTextElement(main, "h2", "抽样检测结果");
   main.append(report.querySelector("[data-report-samples]").cloneNode(true));
-  appendTextElement(main, "p", report.querySelector("textarea[name=inspection_result]").value.trim() || "未填写检测结果");
+  const inspectionResult = report.querySelector("textarea[name=inspection_result]")?.value
+    ?? report.querySelector("[data-inspection-result]")?.innerText ?? "";
+  appendTextElement(main, "p", inspectionResult.trim() || "未填写检测结果");
   appendTextElement(main, "h2", "现场打卡记录");
   const checkins = report.querySelector("[data-checkin-history]");
   if (checkins.children.length) main.append(checkins.cloneNode(true));
@@ -159,6 +166,8 @@ function exportReport(report) {
 }
 
 for (const report of document.querySelectorAll("[data-sampling-report]")) {
+  report.querySelector("[data-export-report]")?.addEventListener("click", () => exportReport(report));
+  if (report.hasAttribute("data-report-readonly")) continue;
   const form = report.querySelector("[data-report-form]");
   const csrfToken = form.querySelector("[name=csrfmiddlewaretoken]").value;
   const saveStatus = report.querySelector("[data-report-save-status]");
@@ -228,6 +237,5 @@ for (const report of document.querySelectorAll("[data-sampling-report]")) {
     );
   });
 
-  report.querySelector("[data-export-report]").addEventListener("click", () => exportReport(report));
   addPhotoPreviews(report);
 }

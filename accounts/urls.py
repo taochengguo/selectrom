@@ -10,7 +10,7 @@ app_name = "accounts"
 urlpatterns = [
     path(
         "favicon.ico",
-        RedirectView.as_view(url=static("img/sampling-hero.png")),
+        RedirectView.as_view(url=static("img/favicon.webp")),
         name="favicon",
     ),
     path("login/", views.login_view, name="login"),

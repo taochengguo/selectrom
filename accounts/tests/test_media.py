@@ -43,4 +43,8 @@ class DebugMediaServingTests(TestCase):
             clear_url_caches()
 
         self.assertEqual(avatar_response.status_code, 200)
-        self.assertEqual(b"".join(avatar_response.streaming_content), image_bytes)
+        saved_bytes = b"".join(avatar_response.streaming_content)
+        with Image.open(BytesIO(saved_bytes)) as saved:
+            self.assertEqual(saved.format, "WEBP")
+            self.assertEqual(saved.size, (2, 2))
+        self.assertTrue(avatar_name.endswith(".webp"))

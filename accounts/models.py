@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from accounts.fields import WebPImageField
 
 
 class User(AbstractUser):
@@ -15,8 +16,7 @@ class User(AbstractUser):
         ICON5 = "icon5", "头像 5"
 
     role = models.CharField(max_length=16, choices=Role.choices)
-    phone = models.CharField(max_length=32, blank=True)
-    avatar = models.ImageField(upload_to="avatars/", blank=True)
+    avatar = WebPImageField(upload_to="avatars/", blank=True)
     avatar_choice = models.CharField(
         max_length=5, choices=AvatarChoice.choices, default=AvatarChoice.ICON1
     )

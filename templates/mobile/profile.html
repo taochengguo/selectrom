@@ -37,7 +37,7 @@
     <div class="profile-dialog__header"><h2 id="profile-dialog-title">个人设置</h2><button type="button" class="profile-dialog__close" data-close-dialog aria-label="关闭个人设置"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
     <form class="mobile-form" method="post">
       {% csrf_token %}<input type="hidden" name="action" value="update_profile">
-      <div class="profile-field"><label for="{{ form.first_name.id_for_label }}">昵称</label>{{ form.first_name }}{{ form.first_name.errors }}</div>
+      <div class="profile-field"><label for="{{ form.first_name.id_for_label }}">用户姓名</label>{{ form.first_name }}{{ form.first_name.errors }}</div>
       <fieldset class="avatar-picker"><legend>选择头像</legend><div class="avatar-picker__options">
         {% for option in avatar_options %}
           <label class="avatar-picker__option"><input type="radio" name="avatar_choice" value="{{ option.value }}"{% if form.avatar_choice.value == option.value %} checked{% endif %}><img src="{{ option.url }}" alt=""><span>{{ option.label }}</span></label>

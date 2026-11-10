@@ -11,6 +11,33 @@ from sampling.models import SamplingTask
 
 
 class TaskLogViewTests(TestCase):
+    def test_actor_name_filter_and_display(self):
+        self.admin.first_name = "张三"
+        self.admin.save(update_fields=["first_name"])
+        response = self.client.get(reverse("management:log-list"), {"actor_name": "张三"})
+        self.assertEqual(list(response.context["logs"]), [self.matching])
+        self.assertContains(response, "张三")
+        self.assertNotContains(response, '<span class="audit-secondary">admin</span>')
+
+    def test_categories_and_compact_details(self):
+        response = self.client.get(reverse("management:log-list"), {"category": "task"})
+        self.assertEqual(response.context["page"].paginator.count, 2)
+        self.assertContains(response, "账号与权限")
+        self.assertContains(response, "操作摘要")
+        self.assertContains(response, '<details class="audit-detail">')
+        response = self.client.get(reverse("management:log-list"), {"category": "account"})
+        self.assertEqual(list(response.context["logs"]), [])
+        self.assertContains(response, "暂无符合条件的日志")
+
+    def test_pagination_preserves_filters(self):
+        TaskAuditLog.objects.bulk_create([
+            TaskAuditLog(task=self.task_a, actor=self.admin, event_type="task.updated")
+            for _ in range(21)
+        ])
+        response = self.client.get(reverse("management:log-list"), {"category": "task", "actor": "admin", "page": 2})
+        self.assertEqual(len(response.context["logs"]), 2)
+        self.assertIn("actor=admin", response.context["query"])
+
     def setUp(self):
         self.admin = User.objects.create_user("admin", role=User.Role.ADMIN)
         self.other_admin = User.objects.create_user("auditor", role=User.Role.ADMIN)

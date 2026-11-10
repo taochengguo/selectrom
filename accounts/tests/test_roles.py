@@ -81,7 +81,7 @@ class RoleGateTests(TestCase):
         self.assertEqual(self.sampler.first_name, "抽样")
         self.assertEqual(self.sampler.avatar_choice, "icon3")
         self.assertEqual(self.sampler.last_name, "")
-        self.assertEqual(self.sampler.phone, "")
+        self.assertFalse(hasattr(self.sampler, "phone"))
         self.assertEqual(self.sampler.username, "sampler")
         self.assertEqual(self.sampler.role, User.Role.SAMPLER)
 

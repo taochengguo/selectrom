@@ -7,32 +7,43 @@
 <section class="mobile-card workflow-progress" aria-label="任务进度">
   <p>{{ task.task_number }}</p>
   <h2>{{ task.name }}</h2>
-  <ol class="workflow-steps">
-    <li class="{% if step >= 1 %}is-current{% endif %}">打卡</li>
-    <li class="{% if step >= 2 %}is-current{% endif %}">编号</li>
-    <li class="{% if step >= 3 %}is-current{% endif %}">抽样</li>
-    <li class="{% if step >= 4 %}is-current{% endif %}">结果</li>
-    <li class="{% if step >= 5 %}is-current{% endif %}">完成</li>
-  </ol>
-  <progress value="{{ step }}" max="5">{{ step }}/5</progress>
+  <nav class="workflow-steps" aria-label="抽样步骤">
+    {% if task.status == 'completed' %}
+    <span class="workflow-step is-done">打卡</span>
+    <span class="workflow-step is-done">编号</span>
+    <span class="workflow-step is-done">抽样</span>
+    <span class="workflow-step is-done">结果</span>
+    <span class="workflow-step is-current" aria-current="step">完成</span>
+    {% else %}
+    <a href="?step=1" class="workflow-step{% if step == 1 %} is-current{% endif %}{% if available_step > 1 %} is-done{% endif %}"{% if step == 1 %} aria-current="page"{% endif %}><span>打卡</span></a>
+    <a href="?step=2" class="workflow-step{% if step == 2 %} is-current{% endif %}{% if available_step > 2 %} is-done{% endif %}{% if available_step < 2 %} is-locked{% endif %}"{% if step == 2 %} aria-current="page"{% endif %}{% if available_step < 2 %} aria-disabled="true" tabindex="-1"{% endif %}><span>编号</span></a>
+    <a href="?step=3" class="workflow-step{% if step == 3 %} is-current{% endif %}{% if available_step > 3 %} is-done{% endif %}{% if available_step < 3 %} is-locked{% endif %}"{% if step == 3 %} aria-current="page"{% endif %}{% if available_step < 3 %} aria-disabled="true" tabindex="-1"{% endif %}><span>抽样</span></a>
+    <a href="?step=4" class="workflow-step{% if step == 4 %} is-current{% endif %}{% if available_step > 4 %} is-done{% endif %}{% if available_step < 4 %} is-locked{% endif %}"{% if step == 4 %} aria-current="page"{% endif %}{% if available_step < 4 %} aria-disabled="true" tabindex="-1"{% endif %}><span>结果</span></a>
+    <a href="?step=5" class="workflow-step{% if step == 5 %} is-current{% endif %}{% if available_step < 5 %} is-locked{% endif %}"{% if step == 5 %} aria-current="page"{% endif %}{% if available_step < 5 %} aria-disabled="true" tabindex="-1"{% endif %}><span>完成</span></a>
+    {% endif %}
+  </nav>
 </section>
 
 {% if step == 3 %}
 <section class="mobile-card sampling-stage" aria-labelledby="draw-heading">
   <div class="section-heading"><h2 id="draw-heading">第三步 · 随机抽样</h2></div>
-  <p>编号照片已上传，现在开始随机抽取样品。</p>
-  <div id="sampling-reel" aria-live="polite">点击开始抽样</div>
+  <p>编号照片已上传，确认数量后抽取样品。</p>
+  <div id="sampling-reel" aria-label="盲盒球体抽样">
+    <div class="sampling-machine-title">抽样球仓</div>
+    <div class="sampling-machine"><div class="sampling-chamber" aria-hidden="true"></div><div class="sampling-outlet" aria-hidden="true"></div><div class="sampling-picked" aria-label="已抽中编号"></div></div>
+    <div class="sampling-progress" aria-live="polite">等待抽样</div>
+  </div>
   <p id="sampling-error" role="alert"></p>
   {% if draw_action %}
   <form id="draw-form" method="post" action="{% url 'mobile:task-draw' task.pk %}">
     {% csrf_token %}
     {% if task.sample_mode == 'unit' and draw_action == 'initial' %}
     <div class="sampling-count-fields">
-      <label>样品数量 <input name="sample_quantity" type="number" min="1" step="1" required></label>
-      <label>抽样样品数 <input name="draw_count" type="number" min="1" max="10000" step="1" required></label>
+      <label>样品数量 <input name="sample_quantity" value="{{ task.sample_quantity|default_if_none:'' }}" type="number" min="1" step="1" required></label>
+      <label>抽样样品数 <input name="draw_count" value="{{ task.draw_count|default_if_none:'' }}" type="number" min="1" max="10000" step="1" required></label>
     </div>
     {% endif %}
-    <button id="draw-trigger" type="submit">开始随机抽样</button>
+    <button id="draw-trigger" type="submit">开始抽样</button>
   </form>
   {% endif %}
 </section>
@@ -46,6 +57,7 @@
     <div><dt>物资名称</dt><dd>{{ task.material_name|default:task.name }}</dd></div>
     <div><dt>收货单位</dt><dd>{{ task.receiving_unit }}</dd></div>
     <div><dt>收货地址</dt><dd>{{ task.delivery_address }}</dd></div>
+      <div><dt>详细地址</dt><dd>{{ task.detailed_address|default:"未填写" }}</dd></div>
     <div><dt>样品数量</dt><dd>{{ task.sample_quantity }}</dd></div>
     <div><dt>抽样样品数</dt><dd>{{ task.draw_count }}</dd></div>
     <div><dt>任务状态</dt><dd>{{ task.get_status_display }}</dd></div>
@@ -53,7 +65,7 @@
 </section>
 {% endif %}
 
-{% if step != 3 %}
+{% if step != 3 and step != 5 %}
 <div class="workflow-report workflow-report--step-{{ step }}">
   {% include "mobile/sampling_report.html" %}
 </div>
@@ -61,7 +73,7 @@
 
 {% if step == 1 or step == 2 %}
 <p class="workflow-next"><a class="button" href="{% url 'mobile:task-workflow' task.pk %}">我已完成此步，继续</a></p>
-{% elif step == 4 %}
+{% elif step == 4 and task.status != "completed" %}
 <form class="mobile-card workflow-entry" method="post" action="{% url 'mobile:task-complete' task.pk %}">
   {% csrf_token %}<button type="submit">完成抽样任务</button>
 </form>
@@ -71,6 +83,7 @@
 <script type="module">
   import { runSamplingAnimation } from "{% static 'js/sampling-animation.js' %}";
   import "{% static 'js/sampling-report.js' %}";
+  document.querySelectorAll(".workflow-step.is-locked").forEach(link => link.addEventListener("click", event => event.preventDefault()));
   const form = document.querySelector('#draw-form');
   if (form) form.addEventListener('submit', async (event) => {
     event.preventDefault();

@@ -1,10 +1,12 @@
 from datetime import datetime, time, timedelta
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
 from PIL import Image, UnidentifiedImageError
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
+from django.core.files.base import ContentFile
 
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -207,8 +209,10 @@ def reminders(request):
 
 
 @sampler_required
-def task_detail(request, pk):
+def task_detail(request, pk, report_details=False):
     task = _owned_task(request.user, pk)
+    if report_details and task.status != SamplingTask.Status.COMPLETED:
+        return redirect("mobile:task-detail", pk=pk)
     assignment = _current_assignment(task, request.user)
     task, assignment = _mark_current_assignment_viewed(
         task, assignment, request.user
@@ -236,6 +240,7 @@ def task_detail(request, pk):
             "candidate_count": task.candidates.count(),
             "draw_action": _draw_action(task),
             "report_batches": report_batches,
+            "report_details": report_details,
         },
     )
 
@@ -259,6 +264,19 @@ def task_start(request, pk):
 
 @sampler_required
 @require_GET
+def task_report_pdf(request, pk):
+    from sampling.services.report_pdf import build_report_pdf
+
+    task = _owned_task(request.user, pk)
+    if task.status != SamplingTask.Status.COMPLETED:
+        return JsonResponse({"error": "请先完成抽样任务"}, status=400)
+    batches = task.sampling_batches.filter(status=SamplingBatch.Status.LOCKED).order_by("-version")
+    return FileResponse(build_report_pdf(task, batches, _photo_storage()),
+                        as_attachment=True, filename=f"抽样报告-{task.task_number}.pdf", content_type="application/pdf")
+
+
+@sampler_required
+@require_GET
 def task_workflow(request, pk):
     task = _owned_task(request.user, pk)
     batch = task.sampling_batches.order_by("-version").first()
@@ -272,13 +290,20 @@ def task_workflow(request, pk):
     has_checkin = bool(report_record and report_record.checkins.exists())
     has_photo = batch.photos.exists()
     has_result = bool(report_record and report_record.inspection_result.strip())
-    step = (5 if task.status == SamplingTask.Status.COMPLETED else
-            1 if not has_checkin else 2 if not has_photo else
-            3 if batch.status != SamplingBatch.Status.LOCKED else 4)
+    available_step = (5 if task.status == SamplingTask.Status.COMPLETED else
+                      1 if not has_checkin else 2 if not has_photo else
+                      3 if batch.status != SamplingBatch.Status.LOCKED else 4)
+    try:
+        requested_step = int(request.GET.get("step", available_step))
+    except (TypeError, ValueError):
+        requested_step = available_step
+    step = requested_step if 1 <= requested_step <= available_step else available_step
+    if task.status == SamplingTask.Status.COMPLETED:
+        step = 5
     return render(request, "mobile/task_workflow.html", {
         "task": task, "batch": batch, "report_batch": batch,
         "results": batch.results.select_related("material").order_by("sequence"),
-        "draw_action": _draw_action(task), "step": step,
+        "draw_action": _draw_action(task) if step == available_step else None, "step": step, "available_step": available_step,
         "has_checkin": has_checkin, "has_photo": has_photo,
         "has_result": has_result,
     })
@@ -333,8 +358,12 @@ def _photo_storage():
 
 @sampler_required
 @require_POST
+@transaction.atomic
 def task_report_photos(request, pk, batch_id):
     batch = _photo_batch(request, pk, batch_id)
+    task = SamplingTask.objects.select_for_update().get(pk=pk)
+    if task.status == SamplingTask.Status.COMPLETED:
+        return JsonResponse({"error": "任务已完成，所有信息不可修改"}, status=400)
     upload = request.FILES.get("photo")
     if upload is None:
         return JsonResponse({"error": "请选择照片"}, status=400)
@@ -349,13 +378,17 @@ def task_report_photos(request, pk, batch_id):
     if image_format not in {"JPEG", "PNG", "WEBP"}:
         return JsonResponse({"error": "仅支持 JPG、PNG 或 WebP 图片"}, status=400)
     upload.seek(0)
+    try:
+        from config.images import encode_webp
+        converted = BytesIO(encode_webp(upload))
+    except (OSError, ValueError):
+        return JsonResponse({"error": "图片转换失败"}, status=400)
     from django.db import transaction
     with transaction.atomic():
         SamplingBatch.objects.select_for_update().get(pk=batch.pk)
         if batch.photos.count() >= 3:
             return JsonResponse({"error": "最多上传 3 张照片"}, status=400)
-        extension = {"JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp"}[image_format]
-        path = _photo_storage().save(f"{batch.task_id}/{batch.pk}/{uuid4().hex}{extension}", upload)
+        path = _photo_storage().save(f"{batch.task_id}/{batch.pk}/{uuid4().hex}.webp", ContentFile(converted.getvalue()))
         photo = SamplingPhoto.objects.create(batch=batch, path=path, original_name=Path(upload.name).name[:255])
     return JsonResponse({"photo": _photo_data(photo)}, status=201)
 
@@ -383,8 +416,12 @@ def task_report_photo(request, pk, batch_id, photo_id):
 
 @sampler_required
 @require_POST
+@transaction.atomic
 def task_report_photo_delete(request, pk, batch_id, photo_id):
     batch = _photo_batch(request, pk, batch_id)
+    task = SamplingTask.objects.select_for_update().get(pk=pk)
+    if task.status == SamplingTask.Status.COMPLETED:
+        return JsonResponse({"error": "任务已完成，所有信息不可修改"}, status=400)
     photo = get_object_or_404(batch.photos, pk=photo_id)
     path = photo.path
     photo.delete()
@@ -463,9 +500,9 @@ def profile(request):
             "form": profile_form,
             "password_form": password_form,
             "summary": summary,
-            "avatar_url": static(f"img/{request.user.avatar_choice}.png"),
+            "avatar_url": static(f"img/{request.user.avatar_choice}.webp"),
             "avatar_options": [
-                {"value": value, "label": label, "url": static(f"img/{value}.png")}
+                {"value": value, "label": label, "url": static(f"img/{value}.webp")}
                 for value, label in User.AvatarChoice.choices
             ],
         },

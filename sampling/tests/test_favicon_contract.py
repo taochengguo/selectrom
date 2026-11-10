@@ -10,9 +10,9 @@ class FaviconContractTests(SimpleTestCase):
 
         self.assertContains(
             response,
-            '<link rel="icon" href="/static/img/favicon.png">',
+            '<link rel="icon" href="/static/img/favicon.webp">',
             html=True,
         )
         self.assertTrue(
-            Path(settings.BASE_DIR, "static", "img", "favicon.png").is_file()
+            Path(settings.BASE_DIR, "static", "img", "favicon.webp").is_file()
         )

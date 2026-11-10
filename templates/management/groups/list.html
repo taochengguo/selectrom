@@ -4,16 +4,106 @@
   <section class="page-card">
     <div class="page-heading">
       <div><h1>人员分组</h1><p>随机分配将从所选分组的全部当前成员中抽取一人</p></div>
-      <a class="button" href="{% url 'personnel:group-create' %}">新建分组</a>
+      <div class="inline-actions"><button class="button button--secondary" type="button" id="start-group-delete"{% if not groups %} disabled{% endif %}><i class="bi bi-trash3" aria-hidden="true"></i> 批量删除</button><button class="button" type="button" id="open-group-dialog"><i class="bi bi-plus-lg" aria-hidden="true"></i> 新建分组</button></div>
     </div>
+    <form method="post" action="{% url 'personnel:group-bulk-delete' %}" id="group-delete-form">
+      {% csrf_token %}
+      <div class="group-bulk-toolbar" id="group-bulk-toolbar" hidden><label><input type="checkbox" id="select-all-groups"> 全选</label><span id="group-delete-count">已选 0 个分组</span><div><button class="button button--secondary" type="button" id="cancel-group-delete">取消</button><button class="button group-delete-button" type="button" id="confirm-group-delete" disabled>删除所选</button></div></div>
     <ul class="group-list">
       {% for group in groups %}
         <li class="group-card">
-          <div class="page-heading"><strong>{{ group.name }}</strong><a class="button button--secondary" href="{% url 'personnel:group-edit' group.pk %}">编辑</a></div>
+          <div class="page-heading"><div class="group-card__title"><input class="group-delete-checkbox" type="checkbox" name="groups" value="{{ group.pk }}" data-group-name="{{ group.name }}" aria-label="选择分组 {{ group.name }}" hidden><strong>{{ group.name }}</strong></div><a class="button button--secondary" href="{% url 'personnel:group-edit' group.pk %}">编辑</a></div>
+          <div class="group-card__members" aria-label="分组组员">
+            {% for member in group.members.all %}<span class="group-card__member"><i class="bi bi-person" aria-hidden="true"></i> {% if member.get_full_name %}{{ member.get_full_name }}{% else %}未填写姓名{% endif %}</span>{% empty %}<span class="group-card__empty">暂无组员</span>{% endfor %}
+          </div>
         </li>
       {% empty %}
         <li class="empty-state">暂无分组</li>
       {% endfor %}
     </ul>
+    </form>
   </section>
+  <dialog class="user-dialog group-delete-dialog" id="group-delete-confirm" aria-labelledby="group-delete-title">
+    <header class="user-dialog__header"><span class="user-dialog__icon"><i class="bi bi-trash3" aria-hidden="true"></i></span><div><h2 id="group-delete-title">确认删除分组</h2><p>请核对所选分组</p></div></header>
+    <div class="user-dialog__fields"><p id="group-delete-summary"></p><ul id="group-delete-names"></ul><p class="user-dialog__hint">删除后无法恢复分组，组员账号会保留。有关联抽样任务的分组不会删除。</p></div>
+    <footer class="user-dialog__footer"><button class="button button--secondary" type="button" id="dismiss-group-delete">取消</button><button class="button group-delete-button" type="submit" form="group-delete-form">确认删除</button></footer>
+  </dialog>
+  <script>
+    (() => {
+      const form = document.getElementById('group-delete-form');
+      const toolbar = document.getElementById('group-bulk-toolbar');
+      const inputs = [...form.querySelectorAll('input[name="groups"]')];
+      const all = document.getElementById('select-all-groups');
+      const confirm = document.getElementById('confirm-group-delete');
+      const dialog = document.getElementById('group-delete-confirm');
+      const selected = () => inputs.filter(input => input.checked);
+      const update = () => {
+        const count = selected().length;
+        document.getElementById('group-delete-count').textContent = `已选 ${count} 个分组`;
+        confirm.disabled = count === 0;
+        all.checked = inputs.length > 0 && count === inputs.length;
+        all.indeterminate = count > 0 && count < inputs.length;
+        inputs.forEach(input => input.closest('.group-card').classList.toggle('is-selected', input.checked));
+      };
+      const toggle = active => {
+        toolbar.hidden = !active;
+        inputs.forEach(input => { input.hidden = !active; input.checked = false; });
+        document.getElementById('start-group-delete').hidden = active;
+        update();
+      };
+      document.getElementById('start-group-delete').addEventListener('click', () => toggle(true));
+      document.getElementById('cancel-group-delete').addEventListener('click', () => toggle(false));
+      inputs.forEach(input => input.addEventListener('change', update));
+      all.addEventListener('change', () => { inputs.forEach(input => { input.checked = all.checked; }); update(); });
+      confirm.addEventListener('click', () => {
+        document.getElementById('group-delete-summary').textContent = `将删除所选的 ${selected().length} 个分组：`;
+        const names = document.getElementById('group-delete-names');
+        names.replaceChildren();
+        selected().forEach(input => { const item = document.createElement('li'); item.textContent = input.dataset.groupName; names.appendChild(item); });
+        dialog.showModal();
+      });
+      document.getElementById('dismiss-group-delete').addEventListener('click', () => dialog.close());
+    })();
+  </script>
+  <dialog class="user-dialog group-dialog" id="group-create-dialog" aria-labelledby="group-dialog-title">
+    <header class="user-dialog__header"><span class="user-dialog__icon"><i class="bi bi-people" aria-hidden="true"></i></span><div><h2 id="group-dialog-title">{% if editing_group %}编辑分组{% else %}新建分组{% endif %}</h2><p>组织抽样团队，灵活分配任务</p></div><button class="user-dialog__close" type="button" data-close-group aria-label="关闭分组弹窗"><i class="bi bi-x-lg" aria-hidden="true"></i></button></header>
+    <form method="post" action="{% if editing_group %}{% url 'personnel:group-edit' editing_group.pk %}{% else %}{% url 'personnel:group-create' %}{% endif %}">
+      {% csrf_token %}
+      <div class="user-dialog__fields">
+        {{ form.non_field_errors }}
+        <div class="user-dialog__field"><label for="{{ form.name.id_for_label }}">分组名称 <span class="user-dialog__required">*</span></label>{{ form.name }}<div class="user-dialog__errors">{{ form.name.errors }}</div></div>
+        <div class="user-dialog__field"><label for="{{ form.description.id_for_label }}">分组说明 <span class="group-optional">选填</span></label>{{ form.description }}<div class="user-dialog__errors">{{ form.description.errors }}</div></div>
+        <fieldset class="group-members"><legend>选择抽样人员 <span id="group-selected-count">已选 0 人</span></legend><p class="user-dialog__hint">勾选需要加入分组的成员，可选择多位</p>
+          <div class="group-members__grid">{% for checkbox in form.members %}<label class="group-member">{{ checkbox.tag }}<span class="group-member__avatar"><i class="bi bi-person" aria-hidden="true"></i></span><span>{{ checkbox.choice_label }}</span></label>{% empty %}<p class="group-members__empty">暂无抽样人员，请先在用户管理中创建账号。</p>{% endfor %}</div><div class="user-dialog__errors">{{ form.members.errors }}</div>
+        </fieldset>
+      </div>
+      <footer class="user-dialog__footer"><button class="button button--secondary" type="button" data-close-group>取消</button><button class="button" type="submit">{% if editing_group %}保存修改{% else %}创建分组{% endif %}</button></footer>
+    </form>
+  </dialog>
+  <script>
+    (() => {
+      const dialog = document.getElementById('group-create-dialog');
+      document.getElementById('open-group-dialog').addEventListener('click', () => {
+        const form = dialog.querySelector('form');
+        form.action = "{% url 'personnel:group-create' %}";
+        form.elements.name.value = '';
+        form.elements.description.value = '';
+        form.querySelectorAll('input[name="members"]').forEach(input => { input.checked = false; });
+        form.querySelectorAll('.errorlist').forEach(list => list.remove());
+        document.getElementById('group-dialog-title').textContent = '新建分组';
+        form.querySelector('[type="submit"]').textContent = '创建分组';
+        count();
+        dialog.showModal();
+      });
+      dialog.querySelectorAll('[data-close-group]').forEach(button => button.addEventListener('click', () => dialog.close()));
+      dialog.addEventListener('click', event => {
+        const bounds = dialog.getBoundingClientRect();
+        if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) dialog.close();
+      });
+      const count = () => { document.getElementById('group-selected-count').textContent = `已选 ${dialog.querySelectorAll('input[name="members"]:checked').length} 人`; };
+      dialog.addEventListener('change', count);
+      count();
+      {% if open_group_dialog %}dialog.showModal();{% endif %}
+    })();
+  </script>
 {% endblock %}

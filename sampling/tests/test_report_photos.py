@@ -35,6 +35,9 @@ class ReportPhotoTests(SamplingFixturesMixin, TestCase):
         self.assertEqual(response.status_code, 201)
         photo = SamplingPhoto.objects.get()
         self.assertTrue((Path(self.temp.name) / photo.path).is_file())
+        self.assertTrue(photo.path.endswith(".webp"))
+        with Image.open(Path(self.temp.name) / photo.path) as saved:
+            self.assertEqual(saved.format, "WEBP")
         self.assertContains(self.client.get(reverse("mobile:task-detail", args=[self.task.pk])), response.json()["photo"]["url"])
         image_response = self.client.get(response.json()["photo"]["url"])
         self.assertEqual(image_response.status_code, 200)

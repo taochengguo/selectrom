@@ -6,6 +6,77 @@ from personnel.models import PersonnelGroup
 
 
 class UserManagementTests(TestCase):
+    def test_profile_drawer_updates_only_username_and_name(self):
+        response = self.client.post(reverse("management:user-profile", args=[self.sampler.pk]), {"username": "renamed", "first_name": "王五", "role": "admin", "is_active": ""})
+        self.assertEqual(response.status_code, 200)
+        self.sampler.refresh_from_db()
+        self.assertEqual(self.sampler.username, "renamed")
+        self.assertEqual(self.sampler.first_name, "王五")
+        self.assertEqual(self.sampler.role, "sampler")
+        self.assertTrue(self.sampler.is_active)
+
+    def test_profile_drawer_rejects_duplicate_username_and_sampler_access(self):
+        url = reverse("management:user-profile", args=[self.sampler.pk])
+        response = self.client.post(url, {"username": self.admin.username, "first_name": "王五"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("username", response.json()["errors"])
+        self.client.force_login(self.sampler)
+        self.assertEqual(self.client.post(url, {"username": "renamed", "first_name": "王五"}).status_code, 403)
+
+    def test_inline_role_change_preserves_profile_and_requires_admin(self):
+        self.sampler.first_name = "张三"
+        self.sampler.save()
+        url = reverse("management:user-role", args=[self.sampler.pk])
+        response = self.client.post(url, {"role": "admin"})
+        self.assertEqual(response.status_code, 200)
+        self.sampler.refresh_from_db()
+        self.assertEqual(self.sampler.role, "admin")
+        self.assertEqual(self.sampler.first_name, "张三")
+        self.sampler.role = "sampler"
+        self.sampler.save()
+        self.client.force_login(self.sampler)
+        self.assertEqual(self.client.post(url, {"role": "admin"}).status_code, 403)
+
+    def test_inline_role_change_rejects_self_demotion_and_grouped_sampler(self):
+        response = self.client.post(reverse("management:user-role", args=[self.admin.pk]), {"role": "sampler"})
+        self.assertEqual(response.status_code, 400)
+        group = PersonnelGroup.objects.create(name="测试组", created_by=self.admin)
+        group.members.add(self.sampler)
+        response = self.client.post(reverse("management:user-role", args=[self.sampler.pk]), {"role": "admin"})
+        self.assertEqual(response.status_code, 400)
+        self.sampler.refresh_from_db()
+        self.assertEqual(self.sampler.role, "sampler")
+
+    def test_password_drawer_returns_validation_errors_and_saves(self):
+        url = reverse("management:user-reset-password", args=[self.sampler.pk])
+        response = self.client.post(url, {"password1": "Strong729!New", "password2": "different"}, HTTP_ACCEPT="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("new_password2", response.json()["errors"])
+        response = self.client.post(url, {"password1": "Strong729!New", "password2": "Strong729!New"}, HTTP_ACCEPT="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.sampler.refresh_from_db()
+        self.assertTrue(self.sampler.check_password("Strong729!New"))
+
+    def test_create_dialog_uses_compact_form_and_defaults(self):
+        response = self.client.get(reverse("management:user-create"))
+        form = response.context["form"]
+        self.assertEqual(set(form.fields), {"username", "password1", "first_name", "role"})
+        self.assertEqual(form["role"].value(), User.Role.SAMPLER)
+        self.assertEqual(list(form.fields["role"].choices), list(User.Role.choices))
+        self.assertContains(response, 'id="user-create-dialog"')
+
+    def test_create_with_single_password_and_show_duplicate_in_dialog(self):
+        data = {"username": "new_person", "password1": "StrongRandom729!", "first_name": "张三", "role": "sampler"}
+        response = self.client.post(reverse("management:user-create"), data)
+        self.assertRedirects(response, reverse("management:user-list"))
+        user = User.objects.get(username="new_person")
+        self.assertTrue(user.check_password(data["password1"]))
+        self.assertEqual(user.get_full_name(), "张三")
+        self.assertTrue(user.is_active)
+        response = self.client.post(reverse("management:user-create"), data)
+        self.assertTrue(response.context["open_dialog"])
+        self.assertIn("username", response.context["form"].errors)
+
     def setUp(self):
         self.admin = User.objects.create_user("admin", role=User.Role.ADMIN)
         self.sampler = User.objects.create_user("sampler", role=User.Role.SAMPLER)

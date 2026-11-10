@@ -7,7 +7,7 @@ class FaviconRouteTests(SimpleTestCase):
 
         self.assertRedirects(
             response,
-            "/static/img/sampling-hero.png",
+            "/static/img/favicon.webp",
             status_code=302,
             fetch_redirect_response=False,
         )

@@ -19,7 +19,7 @@ class AuditTests(TestCase):
             created_by=admin,
         )
 
-        admin.phone = "13800000000"
+        admin.first_name = "管理员"
         admin.save()
 
         self.assertEqual(TaskAuditLog.objects.count(), 0)

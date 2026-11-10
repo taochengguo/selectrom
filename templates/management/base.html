@@ -6,29 +6,54 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}随机抽样管理后台{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
-  <link rel="stylesheet" href="{% static 'css/management.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/management.css' %}?v=20261111-reassign-group">
+  <script src="{% static 'js/management-sidebar.js' %}?v=20261110-brand-nav" defer></script>
 </head>
 <body class="management-body">
   <div class="management-shell">
     {% with url_name=request.resolver_match.url_name namespace=request.resolver_match.namespace %}
       <aside class="management-sidebar" aria-label="管理导航">
         <a class="brand-lockup" href="{% url 'management:dashboard' %}">
-          <span class="brand-lockup__name">随机抽样</span>
-          <span class="brand-lockup__caption">管理后台</span>
+          <img class="brand-lockup__logo" src="{% static 'img/中通服图标LOGO.webp' %}" alt="中通服">
+          <span class="brand-lockup__text"><span class="brand-lockup__name">快检随机抽样</span><span class="brand-lockup__caption">管理平台</span></span>
         </a>
-        <nav class="management-nav">
-          <a href="{% url 'management:dashboard' %}"{% if namespace == 'management' and url_name == 'dashboard' %} class="is-active" aria-current="page"{% endif %}>工作台</a>
-          <a href="{% url 'management:task-list' %}"{% if namespace == 'management' and 'task-' in url_name %} class="is-active" aria-current="page"{% endif %}>抽样任务</a>
-          <a href="{% url 'personnel:group-list' %}"{% if namespace == 'personnel' %} class="is-active" aria-current="page"{% endif %}>人员分组</a>
-          <a href="{% url 'management:user-list' %}"{% if namespace == 'management' and 'user-' in url_name %} class="is-active" aria-current="page"{% endif %}>用户管理</a>
-          <a href="{% url 'management:log-list' %}"{% if namespace == 'management' and url_name == 'log-list' %} class="is-active" aria-current="page"{% endif %}>系统日志</a>
+        <p class="sidebar-section-label">工作空间</p>
+        <nav class="management-nav" id="management-navigation">
+          <a href="{% url 'management:dashboard' %}"{% if namespace == 'management' and url_name == 'dashboard' %} class="is-active" aria-current="page"{% endif %} aria-label="工作台" title="工作台"><img class="management-nav__icon" src="{% static 'img/工作台.webp' %}" alt=""><span class="sidebar-label">工作台</span></a>
+          <a href="{% url 'management:task-list' %}"{% if namespace == 'management' and 'task-' in url_name %} class="is-active" aria-current="page"{% endif %} aria-label="抽样任务" title="抽样任务"><img class="management-nav__icon" src="{% static 'img/抽样任务.webp' %}" alt=""><span class="sidebar-label">抽样任务</span></a>
+          <a href="{% url 'personnel:group-list' %}"{% if namespace == 'personnel' %} class="is-active" aria-current="page"{% endif %} aria-label="人员分组" title="人员分组"><img class="management-nav__icon" src="{% static 'img/人员分组.webp' %}" alt=""><span class="sidebar-label">人员分组</span></a>
+          <a href="{% url 'management:user-list' %}"{% if namespace == 'management' and 'user-' in url_name %} class="is-active" aria-current="page"{% endif %} aria-label="用户管理" title="用户管理"><img class="management-nav__icon" src="{% static 'img/用户管理.webp' %}" alt=""><span class="sidebar-label">用户管理</span></a>
+          <a href="{% url 'management:log-list' %}"{% if namespace == 'management' and url_name == 'log-list' %} class="is-active" aria-current="page"{% endif %} aria-label="系统日志" title="系统日志"><img class="management-nav__icon" src="{% static 'img/系统日志.webp' %}" alt=""><span class="sidebar-label">系统日志</span></a>
         </nav>
       </aside>
     {% endwith %}
     <div class="management-main">
       <header class="management-topbar">
+        <div class="management-topbar__navigation">
+          <button class="sidebar-toggle" type="button" aria-label="折叠侧边栏" aria-expanded="true" aria-controls="management-navigation"><i class="bi bi-list" aria-hidden="true"></i></button>
+          <nav class="management-breadcrumb" aria-label="当前位置">
+            <a href="{% url 'management:dashboard' %}">首页</a>
+            <span aria-hidden="true">/</span>
+            {% with url_name=request.resolver_match.url_name namespace=request.resolver_match.namespace %}
+              {% if namespace == 'personnel' %}<a href="{% url 'personnel:group-list' %}">人员分组</a>
+              {% elif 'task-' in url_name or 'candidate-' in url_name %}<a href="{% url 'management:task-list' %}">抽样任务</a>
+              {% elif 'user-' in url_name %}<a href="{% url 'management:user-list' %}">用户管理</a>
+              {% elif url_name == 'log-list' %}<span aria-current="page">系统日志</span>
+              {% else %}<span aria-current="page">工作台</span>{% endif %}
+              {% if url_name == 'task-create' %}<span aria-hidden="true">/</span><span aria-current="page">创建任务</span>
+              {% elif url_name == 'task-detail' %}<span aria-hidden="true">/</span><span aria-current="page">任务详情</span>
+              {% elif url_name == 'task-edit' %}<span aria-hidden="true">/</span><span aria-current="page">编辑任务</span>
+              {% elif url_name == 'task-import' %}<span aria-hidden="true">/</span><span aria-current="page">导入样品</span>
+              {% elif url_name == 'user-create' %}<span aria-hidden="true">/</span><span aria-current="page">创建用户</span>
+              {% elif url_name == 'user-edit' %}<span aria-hidden="true">/</span><span aria-current="page">编辑用户</span>
+              {% elif url_name == 'group-create' %}<span aria-hidden="true">/</span><span aria-current="page">创建分组</span>
+              {% elif url_name == 'group-edit' %}<span aria-hidden="true">/</span><span aria-current="page">编辑分组</span>{% endif %}
+            {% endwith %}
+          </nav>
+        </div>
         <div class="management-user">
-          <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+          <strong>{{ request.user.get_full_name|default:"未填写姓名" }}</strong>
           <span>管理员</span>
         </div>
         <form method="post" action="{% url 'accounts:logout' %}">

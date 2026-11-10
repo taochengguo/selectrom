@@ -1,25 +1,87 @@
 {% extends "management/base.html" %}
+{% load static %}
 {% block title %}用户管理 - 随机抽样{% endblock %}
 {% block content %}
-  <section class="page-card">
+  <section class="page-card users-card">
     <div class="page-heading">
-      <div><h2>用户管理</h2><p>管理员登录后台，抽样人员登录手机端</p></div>
-      <a class="button" href="{% url 'management:user-create' %}">创建用户</a>
+      <div><h2>用户管理 <span class="users-count">{{ users|length }} 位用户</span></h2><p>管理团队成员、用户角色与账号访问权限</p></div>
+      <button class="button" type="button" id="open-user-dialog"><i class="bi bi-plus-lg" aria-hidden="true"></i> 创建用户</button>
     </div>
     <div class="table-scroll">
-      <table>
-        <thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>手机号</th><th>状态</th><th>操作</th></tr></thead>
+      <table class="users-table">
+        <thead><tr><th>用户名</th><th>用户姓名</th><th>用户角色</th><th>账号状态</th><th>操作</th></tr></thead>
         <tbody>{% for managed_user in users %}<tr>
-          <td>{{ managed_user.username }}</td><td>{{ managed_user.get_full_name|default:"-" }}</td><td>{{ managed_user.get_role_display }}</td><td>{{ managed_user.phone|default:"-" }}</td><td><span class="status-chip {% if managed_user.is_active %}status-active{% else %}status-inactive{% endif %}">{% if managed_user.is_active %}启用{% else %}停用{% endif %}</span></td>
+          <td><div class="user-identity"><span class="user-avatar{% if managed_user.role == 'admin' %} user-avatar--admin{% endif %}"><i class="bi bi-person" aria-hidden="true"></i></span><strong>{{ managed_user.username }}</strong>{% if managed_user.pk == request.user.pk %}<span class="user-self">我</span>{% endif %}</div></td>
+          <td>{{ managed_user.get_full_name|default:"未填写" }}</td>
+          <td>{% if request.user.role == 'admin' %}<form class="user-role-form" method="post" action="{% url 'management:user-role' managed_user.pk %}">{% csrf_token %}<select name="role" aria-label="{{ managed_user.get_full_name|default:"未填写姓名" }} 的用户角色" data-saved-role="{{ managed_user.role }}"><option value="sampler"{% if managed_user.role == 'sampler' %} selected{% endif %}>抽样人员</option><option value="admin"{% if managed_user.role == 'admin' %} selected{% endif %}>管理员</option></select></form>{% else %}{{ managed_user.get_role_display }}{% endif %}</td>
+          <td><form class="user-status-form" method="post" action="{% url 'management:user-toggle-active' managed_user.pk %}">{% csrf_token %}<button class="user-state {% if managed_user.is_active %}is-enabled{% endif %}" type="submit" aria-label="{% if managed_user.is_active %}停用{% else %}启用{% endif %} {{ managed_user.get_full_name|default:"未填写姓名" }}"{% if managed_user.pk == request.user.pk %} disabled{% endif %}><span></span>{% if managed_user.is_active %}已启用{% else %}已停用{% endif %}</button></form></td>
           <td>
-            <div class="inline-actions"><a class="button button--secondary" href="{% url 'management:user-edit' managed_user.pk %}">编辑</a></div>
-            <form class="inline-form" method="post" action="{% url 'management:user-toggle-active' managed_user.pk %}">{% csrf_token %}<button class="button--secondary" type="submit">{% if managed_user.is_active %}停用{% else %}启用{% endif %}</button></form>
-            <form class="inline-form" method="post" action="{% url 'management:user-reset-password' managed_user.pk %}">
-              {% csrf_token %}<input type="password" name="password1" aria-label="新密码" placeholder="新密码" required><input type="password" name="password2" aria-label="确认新密码" placeholder="确认新密码" required><button type="submit">重置密码</button>
-            </form>
+            <button class="user-password-trigger" type="button" data-profile-url="{% url 'management:user-profile' managed_user.pk %}" data-username="{{ managed_user.username }}" data-full-name="{{ managed_user.get_full_name }}"><i class="bi bi-person-gear" aria-hidden="true"></i> 修改用户信息 <i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+            <button class="user-password-trigger" type="button" data-password-url="{% url 'management:user-reset-password' managed_user.pk %}" data-username="{{ managed_user.username }}" data-full-name="{{ managed_user.get_full_name|default:"未填写姓名" }}"><i class="bi bi-key" aria-hidden="true"></i> 修改密码 <i class="bi bi-chevron-right" aria-hidden="true"></i></button>
           </td>
-        </tr>{% empty %}<tr><td colspan="6">暂无用户</td></tr>{% endfor %}</tbody>
+        </tr>{% empty %}<tr><td colspan="5" class="users-empty">暂无用户，点击“创建用户”添加团队成员</td></tr>{% endfor %}</tbody>
       </table>
     </div>
   </section>
+  <p id="user-feedback" class="user-feedback" role="status" hidden></p>
+  <dialog id="password-drawer" class="password-drawer" aria-labelledby="password-drawer-title">
+    <header class="user-dialog__header"><span class="user-dialog__icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span><div><h2 id="password-drawer-title">修改密码</h2><p>为团队成员设置新的登录密码</p></div><button class="user-dialog__close" type="button" data-close-password aria-label="关闭修改密码"><i class="bi bi-x-lg" aria-hidden="true"></i></button></header>
+    <form id="password-drawer-form" method="post">
+      {% csrf_token %}
+      <div class="password-drawer__body">
+        <div class="password-drawer__account"><span class="user-avatar"><i class="bi bi-person" aria-hidden="true"></i></span><div><strong id="password-user-name"></strong><p id="password-user-account"></p></div></div>
+        <div class="user-dialog__field"><label for="drawer-password1">新密码 <span class="user-dialog__required">*</span></label><input id="drawer-password1" name="password1" type="password" autocomplete="new-password" placeholder="请输入新密码" required><p class="user-dialog__hint">至少 8 位，建议同时包含字母、数字和符号</p></div>
+        <div class="user-dialog__field"><label for="drawer-password2">确认新密码 <span class="user-dialog__required">*</span></label><input id="drawer-password2" name="password2" type="password" autocomplete="new-password" placeholder="请再次输入新密码" required></div>
+        <div id="password-drawer-errors" class="user-dialog__errors" role="alert" hidden></div>
+      </div>
+      <footer class="user-dialog__footer"><button class="button button--secondary" type="button" data-close-password>取消</button><button class="button" type="submit">保存密码</button></footer>
+    </form>
+  </dialog>
+  <dialog id="profile-drawer" class="password-drawer" aria-labelledby="profile-drawer-title">
+    <header class="user-dialog__header"><span class="user-dialog__icon"><i class="bi bi-person-gear" aria-hidden="true"></i></span><div><h2 id="profile-drawer-title">修改用户信息</h2><p>维护用户的登录账号和姓名</p></div><button class="user-dialog__close" type="button" data-close-profile aria-label="关闭修改用户信息"><i class="bi bi-x-lg" aria-hidden="true"></i></button></header>
+    <form id="profile-drawer-form" method="post">
+      {% csrf_token %}
+      <div class="password-drawer__body">
+        <div class="user-dialog__field"><label for="drawer-username">用户名 <span class="user-dialog__required">*</span></label><input id="drawer-username" name="username" type="text" maxlength="150" autocomplete="off" placeholder="请输入用户名" required><p class="user-dialog__hint">修改后请使用新用户名登录</p></div>
+        <div class="user-dialog__field"><label for="drawer-full-name">用户姓名 <span class="user-dialog__required">*</span></label><input id="drawer-full-name" name="first_name" type="text" maxlength="150" placeholder="请输入用户姓名" required></div>
+        <div id="profile-drawer-errors" class="user-dialog__errors" role="alert" hidden></div>
+      </div>
+      <footer class="user-dialog__footer"><button class="button button--secondary" type="button" data-close-profile>取消</button><button class="button" type="submit">保存信息</button></footer>
+    </form>
+  </dialog>
+  <script src="{% static 'js/management-users.js' %}?v=20261111-display-name" defer></script>
+  <dialog id="user-create-dialog" class="user-dialog" aria-labelledby="user-dialog-title">
+    <header class="user-dialog__header">
+      <span class="user-dialog__icon"><i class="bi bi-person-plus" aria-hidden="true"></i></span>
+      <div><h2 id="user-dialog-title">创建用户</h2><p>添加新成员，开启抽样工作</p></div>
+      <button type="button" class="user-dialog__close" data-close-user aria-label="关闭弹窗"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+    </header>
+    <form method="post" action="{% url 'management:user-create' %}" class="user-dialog__form">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="user-dialog__errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="user-dialog__fields">
+        {% for field in form %}
+            <div class="user-dialog__field{% if field.errors %} has-error{% endif %}">
+              <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="user-dialog__required"> *</span>{% endif %}</label>
+              {{ field }}
+              {% if field.name == 'password1' %}<p class="user-dialog__hint">至少 8 位，建议同时包含字母、数字和符号</p>{% endif %}
+              {% if field.errors %}<div class="user-dialog__errors" role="alert">{{ field.errors }}</div>{% endif %}
+            </div>
+        {% endfor %}
+      </div>
+      <footer class="user-dialog__footer"><button type="button" class="button button--secondary" data-close-user>取消</button><button type="submit" class="button">创建用户</button></footer>
+    </form>
+  </dialog>
+  <script>
+    (() => {
+      const dialog = document.getElementById('user-create-dialog');
+      document.getElementById('open-user-dialog').addEventListener('click', () => dialog.showModal());
+      dialog.querySelectorAll('[data-close-user]').forEach(button => button.addEventListener('click', () => dialog.close()));
+      dialog.addEventListener('click', event => {
+        const bounds = dialog.getBoundingClientRect();
+        if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) dialog.close();
+      });
+      {% if open_dialog %}dialog.showModal();{% endif %}
+    })();
+  </script>
 {% endblock %}

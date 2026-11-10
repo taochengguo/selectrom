@@ -24,7 +24,7 @@
     </main>
     {% with url_name=request.resolver_match.url_name %}
       <nav class="mobile-bottom-nav" aria-label="手机端主导航">
-        <a class="mobile-tab{% if request.path == '/m/' %} is-active{% endif %}" href="{% url 'mobile:dashboard' %}"{% if request.path == '/m/' %} aria-current="page"{% endif %}><i class="bi bi-house-fill" aria-hidden="true"></i><span>随机抽样</span></a>
+        <a class="mobile-tab{% if request.path == '/m/' %} is-active{% endif %}" href="{% url 'mobile:dashboard' %}"{% if request.path == '/m/' %} aria-current="page"{% endif %}><i class="bi bi-house-fill" aria-hidden="true"></i><span>工作首页</span></a>
         <a class="mobile-tab{% if url_name == 'reminders' or url_name == 'task-detail' or url_name == 'task-workflow' %} is-active{% endif %}" href="{% url 'mobile:reminders' %}"{% if url_name == 'reminders' or url_name == 'task-detail' or url_name == 'task-workflow' %} aria-current="page"{% endif %}><i class="bi bi-bell-fill" aria-hidden="true"></i><span>任务提醒</span></a>
         <a class="mobile-tab{% if url_name == 'profile' %} is-active{% endif %}" href="{% url 'mobile:profile' %}"{% if url_name == 'profile' %} aria-current="page"{% endif %}><i class="bi bi-person-fill" aria-hidden="true"></i><span>个人中心</span></a>
       </nav>

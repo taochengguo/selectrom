@@ -5,6 +5,7 @@
     <div class="page-heading">
       <div><h2>抽样任务</h2><p>创建、筛选并跟踪任务状态</p></div>
       <div class="inline-actions">
+        <button class="button button--secondary" type="button" id="start-report-export"><i class="bi bi-download" aria-hidden="true"></i> 批量导出报告</button>
         <button class="button button--secondary" type="button" disabled title="Excel 导入将在后续版本开放">Excel 导入（后续开发）</button>
         <button class="button" type="button" id="open-task-dialog">新建任务</button>
       </div>
@@ -18,21 +19,57 @@
       </label>
       <button type="submit">筛选</button>
     </form>
+    <form method="post" action="{% url 'management:task-reports-export' %}" id="report-export-form">
+      {% csrf_token %}
+      <div class="group-bulk-toolbar" id="report-export-toolbar" hidden><label><input type="checkbox" id="select-all-reports"> 全选已完成任务</label><span id="report-export-count">已选 0 个任务</span><div><button class="button button--secondary" type="button" id="cancel-report-export">取消</button><button class="button" type="submit" id="download-reports" disabled>导出所选报告</button></div></div>
+    <p class="report-export-hint" id="report-export-hint" hidden>仅可选择已完成任务，导出为 ZIP；报告文件名：抽样日期_采购订单号_任务编号.pdf。</p>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>任务编号</th><th>物资名称 / 任务名称</th><th>抽样采购订单号</th><th>抽样组</th><th>样品数量</th><th>抽样样品数</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th class="report-select-column" hidden>选择</th><th>任务编号</th><th>物资名称 / 任务名称</th><th>抽样采购订单号</th><th>抽样组</th><th>样品数量</th><th>抽样样品数</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>
         {% for task in tasks %}
           <tr>
+            <td class="report-select-column" hidden><input type="checkbox" name="tasks" value="{{ task.pk }}" aria-label="选择任务 {{ task.task_number }}"{% if task.status != 'completed' %} disabled title="未完成任务，无法导出报告"{% endif %}></td>
             <td>{{ task.task_number }}</td><td>{{ task.name }}</td><td>{{ task.purchase_order_number|default:"—" }}</td><td>{{ task.personnel_group.name }}</td>
             <td>{% if task.sample_mode == 'unit' %}{{ task.sample_quantity|default:"待填写" }}{% else %}—{% endif %}</td><td>{{ task.draw_count|default:"待填写" }}</td><td><span class="status-chip status-{{ task.status }}">{{ task.get_status_display }}</span></td>
-            <td><a href="{% url 'management:task-detail' task.pk %}">查看详情</a></td>
+            <td class="task-report-actions"><a href="{% url 'management:task-detail' task.pk %}">查看详情</a><a href="{% url 'management:task-report' task.pk %}"{% if task.status == 'completed' %} target="_blank" rel="noopener"{% else %} data-report-unfinished{% endif %}>查看抽样报告</a></td>
           </tr>
         {% empty %}<tr><td colspan="8">暂无任务</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
+    </form>
   </section>
+  <dialog class="user-dialog" id="unfinished-report-dialog" aria-labelledby="unfinished-report-title"><header class="user-dialog__header"><span class="user-dialog__icon"><i class="bi bi-file-earmark-lock" aria-hidden="true"></i></span><div><h2 id="unfinished-report-title">暂无法查看报告</h2><p>未完成任务，无法查看抽样报告</p></div></header><footer class="user-dialog__footer"><button type="button" class="button" id="close-unfinished-report">知道了</button></footer></dialog>
+  <script>
+    (() => {
+      const form = document.getElementById('report-export-form');
+      const inputs = [...form.querySelectorAll('input[name="tasks"]:not(:disabled)')];
+      const all = document.getElementById('select-all-reports');
+      const submit = document.getElementById('download-reports');
+      const update = () => {
+        const count = inputs.filter(input => input.checked).length;
+        document.getElementById('report-export-count').textContent = `已选 ${count} 个任务`;
+        submit.disabled = !count;
+        all.checked = inputs.length > 0 && count === inputs.length;
+        all.indeterminate = count > 0 && count < inputs.length;
+      };
+      const toggle = active => {
+        document.getElementById('report-export-toolbar').hidden = !active;
+        document.getElementById('report-export-hint').hidden = !active;
+        document.querySelectorAll('.report-select-column').forEach(cell => { cell.hidden = !active; });
+        inputs.forEach(input => { input.checked = false; });
+        update();
+      };
+      document.getElementById('start-report-export').addEventListener('click', () => toggle(true));
+      document.getElementById('cancel-report-export').addEventListener('click', () => toggle(false));
+      all.addEventListener('change', () => { inputs.forEach(input => { input.checked = all.checked; }); update(); });
+      inputs.forEach(input => input.addEventListener('change', update));
+      const dialog = document.getElementById('unfinished-report-dialog');
+      document.querySelectorAll('[data-report-unfinished]').forEach(link => link.addEventListener('click', event => { event.preventDefault(); dialog.showModal(); }));
+      document.getElementById('close-unfinished-report').addEventListener('click', () => dialog.close());
+    })();
+  </script>
   <dialog id="task-create-dialog" class="task-dialog" aria-labelledby="task-dialog-title">
     <div class="task-dialog__heading">
       <div><h2 id="task-dialog-title">新建抽样任务</h2><p>填写质检、订单、物资与收货信息</p></div>
@@ -44,7 +81,7 @@
       {% if creation_form.non_field_errors %}<div class="form-errors">{{ creation_form.non_field_errors }}</div>{% endif %}
       <div class="task-dialog__grid">
         {% for field in creation_form %}
-          <p><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</p>
+          <p><label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="user-dialog__required">*</span>{% else %}<span class="group-optional">选填</span>{% endif %}</label>{{ field }}{{ field.errors }}</p>
         {% endfor %}
       </div>
       <div class="inline-actions task-dialog__actions">

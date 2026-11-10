@@ -14,8 +14,8 @@ class TaskAuditLog(models.Model):
         related_name="task_audit_logs",
     )
     event_type = models.CharField(max_length=100)
-    before_data = models.JSONField(default=dict)
-    after_data = models.JSONField(default=dict)
+    before_data = models.JSONField(default=dict, blank=True)
+    after_data = models.JSONField(default=dict, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

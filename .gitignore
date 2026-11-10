@@ -10,3 +10,4 @@ startup.*.log
 staticfiles/
 __pycache__/
 *.py[cod]
+.data-backups/

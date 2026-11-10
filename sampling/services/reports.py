@@ -20,6 +20,9 @@ def _locked_batch(task_id, batch_id):
 
 @transaction.atomic
 def save_inspection_result(*, task_id, batch_id, actor, inspection_result):
+    task = SamplingTask.objects.select_for_update().get(pk=task_id)
+    if task.status == SamplingTask.Status.COMPLETED:
+        raise ValueError("任务已完成，所有信息不可修改")
     batch = _locked_batch(task_id, batch_id)
     if not batch.task.personnel_assignments.filter(
         selected_user=actor, is_current=True
@@ -49,6 +52,8 @@ def _site_city(task):
 @transaction.atomic
 def record_checkin(*, task_id, batch_id, actor, latitude=None, longitude=None, note=""):
     task = SamplingTask.objects.select_for_update().get(pk=task_id)
+    if task.status == SamplingTask.Status.COMPLETED:
+        raise ValueError("任务已完成，所有信息不可修改")
     batch = SamplingBatch.objects.select_for_update().get(
         task_id=task_id, pk=batch_id,
         status__in=[SamplingBatch.Status.AUTHORIZED, SamplingBatch.Status.LOCKED],

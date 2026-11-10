@@ -2,16 +2,33 @@
 {% block title %}{% if task %}编辑任务{% else %}创建任务{% endif %} - 随机抽样{% endblock %}
 {% block content %}
   <section class="page-card">
-    <div class="page-heading">
-      <div><h2>{% if task %}编辑抽样任务{% else %}创建抽样任务{% endif %}</h2><p>填写任务信息并指定抽样人员分组</p></div>
-    </div>
-    <form class="form-card" method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <div class="inline-actions">
-        <button type="submit">保存</button>
-        {% if task %}<a class="button button--secondary" href="{% url 'management:task-detail' task.pk %}">返回任务详情</a>{% else %}<a class="button button--secondary" href="{% url 'management:task-list' %}">返回任务列表</a>{% endif %}
-      </div>
-    </form>
+    <div class="page-heading"><div><h2>{% if task %}{{ task.task_number }} · {{ task.name }}{% else %}创建抽样任务{% endif %}</h2><p>{% if task %}编辑任务信息{% else %}填写任务信息并指定抽样人员分组{% endif %}</p></div><button class="button" type="button" id="open-task-form-dialog">{% if task %}编辑任务{% else %}创建任务{% endif %}</button></div>
   </section>
+  <dialog class="task-dialog" id="task-form-dialog" aria-labelledby="task-form-dialog-title">
+    <div class="task-dialog__heading">
+      <div><h2 id="task-form-dialog-title">{% if task %}编辑抽样任务{% else %}创建抽样任务{% endif %}</h2><p>填写质检、订单、物资与收货信息</p></div>
+      <button class="button button--secondary" type="button" data-close-task-form aria-label="关闭弹窗">关闭</button>
+    </div>
+    <form class="form-card task-dialog__form" method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="task-dialog__grid">
+        {% for field in form %}<p><label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="user-dialog__required">*</span>{% else %}<span class="group-optional">选填</span>{% endif %}</label>{{ field }}{{ field.errors }}</p>{% endfor %}
+      </div>
+      <div class="inline-actions task-dialog__actions"><button class="button button--secondary" type="button" data-close-task-form>取消</button><button type="submit">{% if task %}保存修改{% else %}保存任务{% endif %}</button></div>
+    </form>
+  </dialog>
+  <script>
+    (() => {
+      const dialog = document.getElementById('task-form-dialog');
+      document.getElementById('open-task-form-dialog').addEventListener('click', () => dialog.showModal());
+      dialog.querySelectorAll('[data-close-task-form]').forEach(button => button.addEventListener('click', () => dialog.close()));
+      dialog.addEventListener('click', event => {
+        const rect = dialog.getBoundingClientRect();
+        if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+      });
+      dialog.addEventListener('close', () => { window.location.href = '{% if task %}{% url "management:task-detail" task.pk %}{% else %}{% url "management:task-list" %}{% endif %}'; });
+      dialog.showModal();
+    })();
+  </script>
 {% endblock %}

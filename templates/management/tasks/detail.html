@@ -22,6 +22,7 @@
       <div><dt>联系人</dt><dd>{{ task.contact_name }}</dd></div>
       <div><dt>收货人电话</dt><dd>{{ task.receiver_phone }}</dd></div>
       <div><dt>收货地址</dt><dd>{{ task.delivery_address }}</dd></div>
+      <div><dt>详细地址</dt><dd>{{ task.detailed_address|default:"未填写" }}</dd></div>
       <div><dt>样品数量</dt><dd>{{ task.sample_quantity|default:"待填写" }}</dd></div>
       <div><dt>抽样样品数</dt><dd>{{ task.draw_count|default:"待填写" }}</dd></div>
       {% else %}
@@ -30,8 +31,9 @@
       {% endif %}
       <div><dt>备注</dt><dd>{{ task.notes|default:"无" }}</dd></div>
     </dl>
-    <div class="action-panel">
-      <div class="action-row">
+    <div class="action-panel task-actions-card">
+      <div class="task-actions-card__heading"><div><h3><i class="bi bi-sliders" aria-hidden="true"></i> 任务操作</h3><p>管理任务信息与人员安排</p></div></div>
+      <div class="action-row task-actions-card__toolbar">
         <a class="button button--secondary" href="{% url 'management:task-edit' task.pk %}">编辑任务</a>
         {% if task.sample_mode == 'material' and task.status == 'draft' or task.sample_mode == 'material' and task.status == 'ready' %}<a class="button button--secondary" href="{% url 'management:task-import' task.pk %}">CSV 导入</a>{% endif %}
         {% if task.status == 'draft' %}
@@ -42,8 +44,15 @@
         {% endif %}
       </div>
       {% if can_reassign %}
-        <form class="inline-form" method="post" action="{% url 'management:task-reassign' task.pk %}">
-          {% csrf_token %}<label>重新分配原因 <input name="reason" required></label><button type="submit">重新分配</button>
+        <form class="task-reassign-form" method="post" action="{% url 'management:task-reassign' task.pk %}">
+          {% csrf_token %}
+          <div class="task-reassign-form__title"><span class="user-dialog__icon"><i class="bi bi-people" aria-hidden="true"></i></span><div><h4>重新分配抽样人员</h4><p>可重选分组，系统将从所选分组随机抽取一人</p></div></div>
+          <div class="task-reassign-form__fields">
+            <label for="reassign-group">抽样人员分组 <span class="user-dialog__required">*</span><select id="reassign-group" name="personnel_group" required>{% for group in reassign_groups %}<option value="{{ group.pk }}"{% if group.pk == task.personnel_group_id %} selected{% endif %}>{{ group.name }}</option>{% endfor %}</select></label>
+            <label for="reassign-reason">重新分配原因 <span class="user-dialog__required">*</span><input id="reassign-reason" name="reason" placeholder="请输入重新安排人员的原因" required></label>
+            <button class="button" type="submit"><i class="bi bi-shuffle" aria-hidden="true"></i> 重新分配</button>
+          </div>
+          <p class="task-reassign-form__note"><i class="bi bi-info-circle" aria-hidden="true"></i> 本次候选人员与分配原因会保留，随机结果可能与原人员相同。</p>
         </form>
       {% endif %}
       {% if task.status == 'in_progress' or task.status == 'completed' %}
@@ -52,7 +61,7 @@
         </form>
       {% endif %}
       {% if task.status != 'cancelled' %}
-        <form class="inline-form" method="post" action="{% url 'management:task-cancel' task.pk %}">{% csrf_token %}<button class="button--danger" type="submit">取消任务</button></form>
+        <div class="task-actions-card__footer"><span>不再执行此任务时，可取消任务。</span><form class="inline-form" method="post" action="{% url 'management:task-cancel' task.pk %}">{% csrf_token %}<button class="button--danger" type="submit">取消任务</button></form></div>
       {% endif %}
     </div>
   </section>
@@ -78,11 +87,11 @@
   {% endif %}
 
   <section class="page-card">
-    <div class="page-heading"><div><h3>人员分配历史</h3><p>保留每次随机分配及候选人员快照</p></div></div>
+    <div class="page-heading"><div><h3>人员分配历史</h3><p>保留每次随机分配时参与抽选的人员名单，姓名显示当前用户姓名</p></div></div>
     <div class="table-scroll">
-      <table><thead><tr><th>类型</th><th>选中人员</th><th>候选人员快照</th><th>原因</th><th>状态</th><th>时间</th></tr></thead><tbody>
-      {% for assignment in task.personnel_assignments.all %}<tr>
-        <td>{{ assignment.get_kind_display }}</td><td>{{ assignment.selected_user.username }}</td><td>{{ assignment.candidate_user_ids }}</td><td>{{ assignment.reason|default:"-" }}</td><td><span class="status-chip {% if assignment.is_current %}status-current{% endif %}">{% if assignment.is_current %}当前{% else %}历史{% endif %}</span></td><td>{{ assignment.created_at }}</td>
+      <table><thead><tr><th>类型</th><th>选中人员</th><th>当次候选人员</th><th>原因</th><th>状态</th><th>时间</th></tr></thead><tbody>
+      {% for assignment in assignments %}<tr>
+        <td>{{ assignment.get_kind_display }}</td><td>{{ assignment.selected_user.get_full_name|default:"未填写姓名" }}</td><td>{{ assignment.candidate_names|join:"、"|default:"无" }}</td><td>{{ assignment.reason|default:"-" }}</td><td><span class="status-chip {% if assignment.is_current %}status-current{% endif %}">{% if assignment.is_current %}当前{% else %}历史{% endif %}</span></td><td>{{ assignment.created_at }}</td>
       </tr>{% empty %}<tr><td colspan="6">尚未分配</td></tr>{% endfor %}
       </tbody></table>
     </div>
@@ -105,7 +114,7 @@
     <div class="page-heading"><div><h3>任务审计时间线</h3><p>仅记录抽样任务相关操作</p></div></div>
     <div class="table-scroll">
       <table><thead><tr><th>时间</th><th>事件</th><th>操作人</th><th>变更前</th><th>变更后</th></tr></thead><tbody>
-      {% for log in task.audit_logs.all %}<tr><td>{{ log.created_at }}</td><td>{{ log.event_type|event_label }}</td><td>{{ log.actor.username }}</td><td>{{ log.before_data|audit_data }}</td><td>{{ log.after_data|audit_data }}</td></tr>{% empty %}<tr><td colspan="5">暂无任务日志</td></tr>{% endfor %}
+      {% for log in task.audit_logs.all %}<tr><td>{{ log.created_at }}</td><td>{{ log.event_type|event_label }}</td><td>{{ log.actor.get_full_name|default:"未填写姓名" }}</td><td>{{ log.before_data|audit_data }}</td><td>{{ log.after_data|audit_data }}</td></tr>{% empty %}<tr><td colspan="5">暂无任务日志</td></tr>{% endfor %}
       </tbody></table>
     </div>
   </section>

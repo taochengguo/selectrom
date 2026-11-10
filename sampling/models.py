@@ -32,12 +32,13 @@ class SamplingTask(models.Model):
     contact_name = models.CharField(max_length=100, blank=True)
     receiver_phone = models.CharField(max_length=30, blank=True)
     delivery_address = models.CharField(max_length=500, blank=True)
+    detailed_address = models.CharField(max_length=500, blank=True)
     site_longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True)
     site_latitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True)
     site_geocoded_at = models.DateTimeField(null=True, blank=True)
     site_city = models.CharField(max_length=100, blank=True)
     personnel_group = models.ForeignKey(
-        PersonnelGroup, on_delete=models.PROTECT, related_name="sampling_tasks"
+        PersonnelGroup, on_delete=models.PROTECT, related_name="sampling_tasks", null=True, blank=True
     )
     planned_at = models.DateTimeField(null=True, blank=True)
     sample_quantity = models.PositiveIntegerField(null=True, blank=True)

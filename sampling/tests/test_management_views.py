@@ -365,6 +365,8 @@ class ManagementViewTests(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 405)
 
     def test_detail_displays_material_assignment_batch_result_and_audit_history(self):
+        self.sampler.first_name = "抽样人员姓名"
+        self.sampler.save(update_fields=["first_name"])
         task = self.make_task(status=SamplingTask.Status.ASSIGNED)
         material = self.add_candidate(task)
         PersonnelAssignment.objects.create(
@@ -381,7 +383,7 @@ class ManagementViewTests(TestCase):
 
         self.assertContains(response, task.task_number)
         self.assertContains(response, material.material_number)
-        self.assertContains(response, self.sampler.username)
+        self.assertContains(response, self.sampler.first_name)
         self.assertContains(response, "版本 1")
         self.assertContains(response, "首次抽样")
         self.assertContains(response, "状态：进行中")

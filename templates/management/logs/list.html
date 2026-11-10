@@ -2,21 +2,32 @@
 {% load audit_display %}
 {% block title %}系统日志 - 随机抽样{% endblock %}
 {% block content %}
-  <section class="page-card">
-    <div class="page-heading"><div><h2>任务系统日志</h2><p>这里只记录抽样任务相关操作</p></div></div>
-    <form class="filter-row" method="get">
-      <label>任务编号 <input name="task_number" value="{{ filters.task_number }}"></label>
-      <label>事件类型 <select name="event_type"><option value="">全部事件</option>{% for event_type in event_types %}<option value="{{ event_type }}"{% if filters.event_type == event_type %} selected{% endif %}>{{ event_type|event_label }}</option>{% endfor %}</select></label>
-      <label>操作人用户名 <input name="actor" value="{{ filters.actor }}"></label>
-      <label>开始日期 <input type="date" name="start_date" value="{{ filters.start_date }}"></label>
-      <label>结束日期 <input type="date" name="end_date" value="{{ filters.end_date }}"></label>
-      <button type="submit">精确筛选</button><a class="button button--secondary" href="{% url 'management:log-list' %}">清除</a>
-    </form>
-    <div class="table-scroll">
-      <table>
-        <thead><tr><th>时间</th><th>任务编号</th><th>事件</th><th>操作人</th><th>变更前</th><th>变更后</th></tr></thead>
-        <tbody>{% for log in logs %}<tr><td>{{ log.created_at }}</td><td><a href="{% url 'management:task-detail' log.task.pk %}">{{ log.task.task_number }}</a></td><td>{{ log.event_type|event_label }}</td><td>{{ log.actor.username }}</td><td>{{ log.before_data|audit_data }}</td><td>{{ log.after_data|audit_data }}</td></tr>{% empty %}<tr><td colspan="6">没有符合条件的任务日志</td></tr>{% endfor %}</tbody>
-      </table>
+<section class="page-card audit-card">
+  <div class="page-heading"><div><h2>系统日志 <span class="users-count">{{ page.paginator.count }} 条记录</span></h2><p>保留关键操作，让账号、人员和抽样过程可追溯</p></div><span class="audit-readonly"><i class="bi bi-shield-check" aria-hidden="true"></i> 只读记录</span></div>
+  <form method="get" class="audit-filter">
+    <div class="audit-tabs" role="group" aria-label="日志类别">
+      <button name="category" value="" class="audit-tab{% if not filters.category %} is-active{% endif %}" type="submit">全部日志</button>
+      {% for key,label in categories %}<button name="category" value="{{ key }}" class="audit-tab{% if filters.category == key %} is-active{% endif %}" type="submit">{{ label }}</button>{% endfor %}
     </div>
-  </section>
+    <div class="audit-filter__fields">
+      <label>任务编号<input name="task_number" value="{{ filters.task_number }}" placeholder="输入完整任务编号"></label>
+      <label>操作人姓名<input name="actor_name" value="{{ filters.actor_name }}" placeholder="输入用户姓名"></label>
+      <label>操作类型<select name="event_type"><option value="">全部操作</option>{% for event_type in event_types %}<option value="{{ event_type }}"{% if filters.event_type == event_type %} selected{% endif %}>{{ event_type|event_label }}</option>{% endfor %}</select></label>
+      <label>开始日期<input type="date" name="start_date" value="{{ filters.start_date }}"></label>
+      <label>结束日期<input type="date" name="end_date" value="{{ filters.end_date }}"></label>
+      <div class="audit-filter__actions"><button name="category" value="{{ filters.category }}" type="submit">查询</button><a class="button button--secondary" href="{% url 'management:log-list' %}">重置</a></div>
+    </div>
+  </form>
+  <div class="table-scroll"><table class="audit-table">
+    <thead><tr><th>时间</th><th>操作人</th><th>操作类型</th><th>关联对象</th><th>操作摘要</th></tr></thead>
+    <tbody>{% for log in logs %}<tr>
+      <td class="audit-time">{{ log.created_at|date:"Y-m-d" }}<span>{{ log.created_at|date:"H:i:s" }}</span></td>
+      <td><strong>{{ log.actor.get_full_name|default:"未填写姓名" }}</strong></td>
+      <td><span class="audit-event">{{ log.event_type|event_label }}</span></td>
+      <td><a class="audit-target" href="{% url 'management:task-detail' log.task.pk %}">{{ log.task.task_number }}</a></td>
+      <td><details class="audit-detail"><summary><span>{{ log|audit_summary|truncatechars:65 }}</span><span class="audit-detail__toggle">详情 <i class="bi bi-chevron-down" aria-hidden="true"></i></span></summary><div class="audit-detail__content"><div><h4>变更前</h4><p>{{ log.before_data|audit_data }}</p></div><div><h4>变更后</h4><p>{{ log.after_data|audit_data }}</p></div></div></details></td>
+    </tr>{% empty %}<tr><td colspan="5"><div class="audit-empty"><i class="bi bi-journal-text" aria-hidden="true"></i><strong>暂无符合条件的日志</strong><p>可调整类别或筛选条件。当前已有历史记录主要为任务与抽样日志。</p></div></td></tr>{% endfor %}</tbody>
+  </table></div>
+  <footer class="audit-pagination"><span>共 {{ page.paginator.count }} 条 · 每页 20 条</span><div>{% if page.has_previous %}<a href="?{{ query }}&page={{ page.previous_page_number }}">上一页</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a href="?{{ query }}&page={{ page.next_page_number }}">下一页</a>{% endif %}</div></footer>
+</section>
 {% endblock %}
