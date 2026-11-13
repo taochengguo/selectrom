@@ -29,12 +29,14 @@ _TASK_FIELDS = {
     "order_line_id", "planned_inspection_date", "receiving_unit", "supplier_name",
     "material_code", "material_name", "specification", "contact_name",
     "receiver_phone", "delivery_address", "detailed_address",
+    "category_name", "source_metadata",
 }
 _UNIT_FIELDS = {
     "inspection_type", "purchase_order_number", "order_line_id",
     "planned_inspection_date", "receiving_unit", "supplier_name",
     "material_code", "material_name", "specification", "contact_name",
     "receiver_phone", "delivery_address", "detailed_address", "personnel_group", "sample_quantity", "draw_count",
+    "category_name", "notes", "source_metadata",
 }
 _CANDIDATE_FIELDS = {
     "material_number",
@@ -67,6 +69,8 @@ def _task_data(task):
         "material_code": task.material_code,
         "material_name": task.material_name,
         "specification": task.specification,
+        "category_name": task.category_name,
+        "source_metadata": task.source_metadata,
         "contact_name": task.contact_name,
         "receiver_phone": task.receiver_phone,
         "delivery_address": task.delivery_address,

@@ -1,12 +1,14 @@
 {% extends "management/base.html" %}
+{% load static %}
 {% block title %}抽样任务 - 随机抽样{% endblock %}
 {% block content %}
+  <link rel="stylesheet" href="{% static 'css/task-excel-import.css' %}">
   <section class="page-card">
     <div class="page-heading">
       <div><h2>抽样任务</h2><p>创建、筛选并跟踪任务状态</p></div>
       <div class="inline-actions">
         <button class="button button--secondary" type="button" id="start-report-export"><i class="bi bi-download" aria-hidden="true"></i> 批量导出报告</button>
-        <button class="button button--secondary" type="button" disabled title="Excel 导入将在后续版本开放">Excel 导入（后续开发）</button>
+        <button class="button button--secondary" type="button" id="open-excel-dialog" data-url="{% url 'management:task-excel-import' %}"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel 导入</button>
         <button class="button" type="button" id="open-task-dialog">新建任务</button>
       </div>
     </div>
@@ -70,6 +72,8 @@
       document.getElementById('close-unfinished-report').addEventListener('click', () => dialog.close());
     })();
   </script>
+  <dialog id="excel-import-dialog" class="excel-dialog" aria-labelledby="excel-dialog-title"><div id="excel-dialog-content"></div></dialog>
+  <script src="{% static 'js/task-excel-import.js' %}" defer></script>
   <dialog id="task-create-dialog" class="task-dialog" aria-labelledby="task-dialog-title">
     <div class="task-dialog__heading">
       <div><h2 id="task-dialog-title">新建抽样任务</h2><p>填写质检、订单、物资与收货信息</p></div>

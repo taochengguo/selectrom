@@ -30,7 +30,7 @@ class UnitSamplingTaskForm(forms.ModelForm):
             "purchase_order_number", "inspection_type", "order_line_id",
             "planned_inspection_date", "receiving_unit", "supplier_name",
             "material_code", "material_name", "specification", "contact_name",
-            "receiver_phone", "delivery_address", "detailed_address", "personnel_group", "sample_quantity", "draw_count",
+            "receiver_phone", "delivery_address", "detailed_address", "personnel_group", "sample_quantity", "draw_count", "category_name", "notes",
         ]
         labels = {
             "inspection_type": "质检类型", "purchase_order_number": "抽样采购订单号",
@@ -38,6 +38,7 @@ class UnitSamplingTaskForm(forms.ModelForm):
             "receiving_unit": "收货单位", "supplier_name": "供应商名称",
             "material_code": "物资编码", "material_name": "物资名称",
             "specification": "规格型号", "contact_name": "联系人",
+            "category_name": "品类名称", "notes": "备注",
             "receiver_phone": "收货人电话", "delivery_address": "收货地址",
             "personnel_group": "抽样人员分组",
             "detailed_address": "详细地址", "sample_quantity": "样品数量", "draw_count": "抽样数量",

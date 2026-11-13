@@ -1,0 +1,9 @@
+{% extends "management/base.html" %}
+{% load static %}
+{% block title %}Excel 导入 - 随机抽样{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/task-excel-import.css' %}">
+<section class="page-card"><h2>抽样任务</h2><a href="{% url 'management:task-list' %}">返回任务列表</a></section>
+<dialog id="excel-import-dialog" class="excel-dialog" data-auto-open data-close-url="{% url 'management:task-list' %}" aria-labelledby="excel-dialog-title"><div id="excel-dialog-content">{% include 'management/tasks/_excel_import_content.html' %}</div></dialog>
+<script src="{% static 'js/task-excel-import.js' %}" defer></script>
+{% endblock %}

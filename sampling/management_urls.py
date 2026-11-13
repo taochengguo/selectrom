@@ -1,6 +1,7 @@
 from django.urls import include, path
 
 from sampling import management_views as views
+from sampling.task_excel_views import task_excel_import
 
 
 app_name = "management"
@@ -9,6 +10,7 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("tasks/", views.task_list, name="task-list"),
     path("tasks/create/", views.task_create, name="task-create"),
+    path("tasks/excel-import/", task_excel_import, name="task-excel-import"),
     path("tasks/reports/export/", views.task_reports_export, name="task-reports-export"),
     path("tasks/<int:pk>/report/", views.task_report, name="task-report"),
     path("tasks/<int:pk>/", views.task_detail, name="task-detail"),

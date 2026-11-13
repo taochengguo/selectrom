@@ -51,6 +51,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+# A 500-row Excel preview has up to 24 editable fields per row.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 15000
+DATA_UPLOAD_MAX_MEMORY_SIZE = 48 * 1024 * 1024
 
 TEMPLATES = [
     {

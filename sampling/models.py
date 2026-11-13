@@ -29,6 +29,8 @@ class SamplingTask(models.Model):
     material_code = models.CharField(max_length=100, blank=True)
     material_name = models.CharField(max_length=200, blank=True)
     specification = models.CharField(max_length=200, blank=True)
+    category_name = models.CharField(max_length=200, blank=True)
+    source_metadata = models.JSONField(default=dict, blank=True)
     contact_name = models.CharField(max_length=100, blank=True)
     receiver_phone = models.CharField(max_length=30, blank=True)
     delivery_address = models.CharField(max_length=500, blank=True)

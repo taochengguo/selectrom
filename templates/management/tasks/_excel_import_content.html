@@ -1,0 +1,35 @@
+<section class="excel-import" data-stage="{% if token %}preview{% else %}upload{% endif %}">
+  <header class="excel-modal-heading"><div class="excel-modal-icon"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i></div><div><h2 id="excel-dialog-title" tabindex="-1">Excel 导入</h2><p>批量创建抽样任务</p></div><button type="button" class="excel-close" data-excel-close aria-label="关闭 Excel 导入"><i class="bi bi-x-lg" aria-hidden="true"></i></button></header>
+  <ol class="excel-steps" aria-label="导入步骤"><li{% if not token %} aria-current="step"{% endif %}><span>1</span>上传文件</li><li{% if token %} aria-current="step"{% endif %}><span>2</span>预览与编辑</li><li><span>3</span>完成导入</li></ol>
+  {% if error %}<div class="excel-error" role="alert">{{ error }}</div>{% endif %}
+  {% if not token %}
+  <form method="post" action="{% url 'management:task-excel-import' %}" enctype="multipart/form-data" class="excel-upload">{% csrf_token %}
+    {{ upload_form.non_field_errors }}
+    <div class="excel-file-zone"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i><strong>选择质检周计划</strong><span>支持 .xlsx · 最大 5MB · 最多 500 条</span><label for="{{ upload_form.file.id_for_label }}" class="excel-file-label">选择 Excel 文件</label>{{ upload_form.file }}<span class="excel-selected-file" data-selected-file>尚未选择文件</span>{{ upload_form.file.errors }}</div>
+    <div class="excel-group-field"><label for="{{ upload_form.personnel_group.id_for_label }}">抽样人员分组 <span>*</span></label>{{ upload_form.personnel_group }}{{ upload_form.personnel_group.errors }}<p class="excel-note">统一应用到本次导入的任务，之后由系统随机分配人员。</p></div>
+    <div class="excel-upload-tip"><i class="bi bi-info-circle" aria-hidden="true"></i><span>第一行请保留表头，采购订单号必填。下一步可修改信息、删除任务，确认后创建草稿。</span></div>
+    <footer class="excel-footer"><button type="button" class="button button--secondary" data-excel-close>取消</button><button class="button" type="submit" name="action" value="upload">下一步，预览任务 <i class="bi bi-arrow-right" aria-hidden="true"></i></button></footer>
+  </form>
+  {% else %}
+  <form method="post" action="{% url 'management:task-excel-import' %}" enctype="multipart/form-data" id="excel-preview-form">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}">
+    <div class="excel-preview-heading"><div><strong>{{ filename }}</strong><p class="excel-note">预览保留 1 小时，尚未创建任务。展开任务可编辑全部信息；删除仅移除本次预览中的记录。</p></div>
+      <label>统一抽样人员分组 <select name="personnel_group" required><option value="">请选择抽样组</option>{% for item in groups %}<option value="{{ item.pk }}"{% if group.pk == item.pk %} selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="excel-summary" aria-live="polite"><span>保留 <strong id="excel-row-count">{{ rows|length }}</strong> 条</span><span>可新增 {{ new_count }} 条</span><span>完全重复 {{ duplicate_count }} 条</span><span>待修正 {{ invalid_count }} 条</span></div>
+    <p class="excel-note" id="excel-change-note">查重比较全部导入信息，包含原表序号、人员、完成数、状态、备注和品类；系统生成的任务编号与时间不参与比较。确认时会重新校验，完全重复记录自动跳过。</p>
+    <div id="excel-rows">
+    {% for row in rows %}
+      <article class="excel-row" data-excel-row>
+        <div class="excel-row-heading"><div><strong>原表第 {{ row.row_number }} 行</strong> <span>{{ row.data.purchase_order_number|default:"采购订单号待填写" }}</span> <span>{{ row.data.material_name }}</span></div><label class="excel-delete"><input type="checkbox" name="row-{{ forloop.counter0 }}-delete" value="1" data-delete> 删除此任务</label></div>
+        <details{% if row.form.errors %} open{% endif %}><summary><span>{% if row.form.errors %}待修正{% elif row.duplicate %}完全重复，将跳过{% else %}校验通过，可导入{% endif %}</span> · 展开编辑任务信息</summary>
+          {{ row.form.non_field_errors }}
+          <div class="excel-fields">{% for field in row.form %}<div class="excel-field{% if field.errors %} excel-field--error{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span aria-label="必填"> *</span>{% endif %}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+        </details>
+      </article>
+    {% empty %}<p>已移除全部记录。请返回任务列表后重新上传。</p>{% endfor %}
+    </div>
+    <div class="excel-footer"><span class="excel-note" id="excel-submit-note">修改或删除后可重新校验；确认导入时以当前保留的信息为准。</span><div class="inline-actions"><button type="submit" name="action" value="validate" class="button button--secondary" formnovalidate>重新校验</button><button type="submit" name="action" value="confirm" class="button" id="excel-confirm"{% if not can_confirm %} disabled{% endif %}>确认导入</button></div></div>
+  </form>
+
+  {% endif %}
+</section>
